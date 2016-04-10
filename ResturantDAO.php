@@ -1,10 +1,15 @@
 <?php
-require "configuration.php"; 
+require_once "configuration.php"; 
 
 class ResturantDAO{
 	
-	$place_id_samtrafiken = "ChIJVVVV6WCdX0YRC0rrPp8ib6Q";
+	var $place_id_samtrafiken;
+	var $max_walking_distance;
 
+	function ResturantDAO() {
+		$this->place_id_samtrafiken = "ChIJVVVV6WCdX0YRC0rrPp8ib6Q";
+		$this->max_walking_distance = 850;
+	}
 	function getPlaceId($id){
 	    if(!($mysqli = mysqli_connect(DB_HOST,DB_USER,DB_PASSWORD, DB_NAME))){
 	        echo "Det här gick ju inte så bra!";
@@ -44,33 +49,58 @@ class ResturantDAO{
 	function load_resturants(){
 		
 		$placeSearchURL = "https://maps.googleapis.com/maps/api/place/radarsearch/json?location=59.3298875,18.0571345&radius=500&type=restaurant&key=".MAP_KEY;
-		$myfile = file_get_contents($placeSearchURL);
-		$placesArray = json_decode($myfile);
-		var_dump($placesArray->results[0]->geometry);
+		$data = file_get_contents($placeSearchURL);
+		$placesArray = json_decode($data);
+		
 		
 		$mysqli = mysqli_connect(DB_HOST,DB_USER,DB_PASSWORD, DB_NAME);
-		if(!$mysqli){
+		if (!$mysqli){
 				echo "Det här gick ju inte så bra!";
 		}
-		$mysqli->query("TRUNCATE restaurants");
+		$mysqli->query("TRUNCATE restaurant_info;");
 
-		$stmt = $mysqli->prepare("INSERT INTO restaurant_info (place_id, latitud, longitud) VALUES (?,?,?)");
-		if(!$stmt){
+		$stmt = $mysqli->prepare("INSERT INTO restaurant_info (place_id, latitud, longitud,distance) VALUES (?,?,?,?)");
+		if (!$stmt){
 				echo "Det gick inte så bra att göra prepare";
 		}
-		$stmt->bind_param("sss", $place_id, $latitud,$longitud); 
+		$stmt->bind_param("sssd", $place_id, $latitud,$longitud,$distance); 
 		foreach ($placesArray->results as $value) {
 
 			$place_id = $value->place_id;
+			$distance = $this->findDistance($place_id);
+
+			
 			$latitud = $value->geometry->location->lat;
 			$longitud = $value->geometry->location->lng;
 			$stmt->execute();
+			
 		
 		}
 		$mysqli->close();
 	}
-	function findDistance(){
+	function getDistance($place_id){
+		 if(!($mysqli = mysqli_connect(DB_HOST,DB_USER,DB_PASSWORD, DB_NAME))){
+	        echo "Det här gick ju inte så bra!";
+	    }
+	    if($stmt = $mysqli->prepare("SELECT distance FROM restaurant_info WHERE id = ?")){
+	        $stmt->bind_param("d", $place_id);
+	        $stmt->execute();
+	        $stmt->bind_result($distance);
+	        $stmt->fetch();
+	        $stmt->close();
+	    }
+	    $mysqli->close();
+	    return $distance;
+	}
+	function findDistance($place_id){
+		
+		$placeSearchURL = "https://maps.googleapis.com/maps/api/directions/json?origin=place_id:".
+							$this->place_id_samtrafiken."&destination=place_id:".$place_id."&mode=walking&key=".MAP_KEY;
 
+		$data = file_get_contents($placeSearchURL);
+		$directionsArray = json_decode($data);
+		$distance = $directionsArray->routes[0]->legs[0]->distance->value;
+		return $distance;
 	}
 		
 }
