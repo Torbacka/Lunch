@@ -37,7 +37,7 @@ function sendToHipchat($data){
 	$curl = curl_init();
 	curl_setopt_array($curl, array(
     		CURLOPT_RETURNTRANSFER => 1,
-        		CURLOPT_URL => 'https://samtrafiken.hipchat.com/v2/room/2491579/notification?auth_token='.CHAT_KEY,
+        		CURLOPT_URL => 'https://samtrafiken.hipchat.com/v2/room/2337917/notification?auth_token='.CHAT_KEY,
     		CURLOPT_POST => 1,
   		CURLOPT_HTTPHEADER => array(
                                             'Content-Type: application/json'
