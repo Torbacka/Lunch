@@ -2,7 +2,6 @@
 require_once "configuration.php"; 
 
 class ResturantDAO{
-	
 	var $place_id_samtrafiken;
 	var $max_walking_distance;
 
@@ -36,23 +35,22 @@ class ResturantDAO{
 	            foreach($row as $cname => $cvalue){
 	                $numberOfRows = $cvalue;
 	            }
-	    
+
 	        $result->close();
 	    }else{
 	        echo "Gick inte så bra att göra SELECT COUNT(*)";
 	    }
 	    $mysqli->close();
-	    return $numberOfRows;            
+	    return $numberOfRows;
 	}
 
 
 	function load_resturants(){
-		
+
 		$placeSearchURL = "https://maps.googleapis.com/maps/api/place/radarsearch/json?location=59.3298875,18.0571345&radius=500&type=restaurant&key=".MAP_KEY;
 		$data = file_get_contents($placeSearchURL);
 		$placesArray = json_decode($data);
-		
-		
+
 		$mysqli = mysqli_connect(DB_HOST,DB_USER,DB_PASSWORD, DB_NAME);
 		if (!$mysqli){
 				echo "Det här gick ju inte så bra!";
@@ -69,15 +67,14 @@ class ResturantDAO{
 			$place_id = $value->place_id;
 			$distance = $this->findDistance($place_id);
 
-			
 			$latitud = $value->geometry->location->lat;
 			$longitud = $value->geometry->location->lng;
 			$stmt->execute();
-			
-		
+
 		}
 		$mysqli->close();
 	}
+
 	function getDistance($place_id){
 		 if(!($mysqli = mysqli_connect(DB_HOST,DB_USER,DB_PASSWORD, DB_NAME))){
 	        echo "Det här gick ju inte så bra!";
@@ -92,8 +89,14 @@ class ResturantDAO{
 	    $mysqli->close();
 	    return $distance;
 	}
+	function addImageForRestaurant(place,$latidud, $longitud){
+		$imageSearchURL =  "https://maps.googleapis.com/maps/api/staticmap?center=59.330994,18.059420&zoom=15&size=800x400&markers=color:blue%7Clabel:M|59.330994,18.059420|&key=AIzaSyBSwIaJb7LBn2btW1mcr1fJ-wi-6KZS00M";
+                $data = file_get_contents($placeSearchURL);
+		//Save the data to image folder
+
+
+	}
 	function findDistance($place_id){
-		
 		$placeSearchURL = "https://maps.googleapis.com/maps/api/directions/json?origin=place_id:".
 							$this->place_id_samtrafiken."&destination=place_id:".$place_id."&mode=walking&key=".MAP_KEY;
 
@@ -102,7 +105,6 @@ class ResturantDAO{
 		$distance = $directionsArray->routes[0]->legs[0]->distance->value;
 		return $distance;
 	}
-		
 }
 
 
