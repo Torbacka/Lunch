@@ -69,6 +69,7 @@ class ResturantDAO{
 
 			$latitud = $value->geometry->location->lat;
 			$longitud = $value->geometry->location->lng;
+			$this->addImageForRestaurant($place_id, $latitud,$longitud);
 			$stmt->execute();
 
 		}
@@ -89,9 +90,13 @@ class ResturantDAO{
 	    $mysqli->close();
 	    return $distance;
 	}
-	function addImageForRestaurant(place,$latidud, $longitud){
-		$imageSearchURL =  "https://maps.googleapis.com/maps/api/staticmap?center=59.330994,18.059420&zoom=15&size=800x400&markers=color:blue%7Clabel:M|59.330994,18.059420|&key=AIzaSyBSwIaJb7LBn2btW1mcr1fJ-wi-6KZS00M";
-                $data = file_get_contents($placeSearchURL);
+	function addImageForRestaurant($place_id,$latidud, $longitud){
+		$imageSearchURL =  "https://maps.googleapis.com/maps/api/staticmap?center=".$latidud.",".$longitud."&zoom=15&size=800x400&markers=color:blue%7Clabel:M|".$latidud.",".$longitud."|&key=AIzaSyBSwIaJb7LBn2btW1mcr1fJ-wi-6KZS00M";
+        $path ='images/'.$place_id. ".jpg";
+        $data = file_get_contents($imageSearchURL);
+        $file = fopen($path, 'w');
+        fwrite($file, $data);
+        fclose($file);
 		//Save the data to image folder
 
 

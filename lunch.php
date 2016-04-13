@@ -10,17 +10,20 @@ function prepareArrayForHipchat(){
 
     $resturantDAO = new ResturantDAO;
     $restaurant_id = rand(1,$resturantDAO->getNumberOfResturants());
-    $placeDataUrl = "https://maps.googleapis.com/maps/api/place/details/json?placeid=" . 
-                    $resturantDAO->getPlaceId($restaurant_id) ."&key=".MAP_KEY;
+    $place_id = $resturantDAO->getPlaceId($restaurant_id);
+    $placeDataUrl = "https://maps.googleapis.com/maps/api/place/details/json?placeid=" . $place_id
+                     ."&key=".MAP_KEY;
     $placeDataArray = json_decode(file_get_contents($placeDataUrl));
     $hipchatArray = array();
+
    $message = $placeDataArray->result->name."    avstånd: " . $resturantDAO->getDistance($restaurant_id)." m";
     if(isset($placeDataArray->result->rating)){
        $message .= "      betyg: " . $placeDataArray->result->rating ."\n" ; 
     }else{
         $message .= "\n"; 
     }
-    $message .= $placeDataArray->result->website; 
+    $message .= $placeDataArray->result->website."\n";
+    $message .= "http://apk.bet/api/images/".$place_id.".jpg";
    // $message = "https://maps.googleapis.com/maps/api/staticmap?center=40.714728,-73.998672&zoom=14&size=400x400&key=AIzaSyBSwIaJb7LBn2btW1mcr1fJ-wi-6KZS00M";
     $hipchatArray["color"] = "green";
     $hipchatArray["message"] = "$message";
