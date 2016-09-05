@@ -65,6 +65,7 @@ class ResturantDAO{
 		foreach ($placesArray->results as $value) {
 
 			$place_id = $value->place_id;
+			echo $place_id;
 			$distance = $this->findDistance($place_id);
 
 			$latitud = $value->geometry->location->lat;
