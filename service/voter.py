@@ -1,7 +1,5 @@
 import html
 
-import requests
-
 from service import mongo_client, slack_client
 
 

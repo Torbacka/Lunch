@@ -36,9 +36,9 @@ def add_actions(attachments, index, vote_index):
             ],
             "callback_id": "vote",
             "color": "3AA3E3",
-            "fallback": "Something wrong happend",
+            "fallback": "Something wrong happened",
             "id": 2,
-            "text": "Choose a resturant"
+            "text": "Choose a restaurant"
         })
 
 

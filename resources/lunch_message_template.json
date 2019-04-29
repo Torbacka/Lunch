@@ -12,7 +12,7 @@
 		{
 			"actions": [
 			],
-			"callback_id": "wopr_game",
+			"callback_id": "vote",
 			"color": "3AA3E3",
 			"fallback": "Something wrong happend",
 			"id": 2,
