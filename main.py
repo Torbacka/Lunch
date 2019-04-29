@@ -33,10 +33,11 @@ def lunch_message(request):
     suggestions.push_suggestions()
 
 
-def suggestion_message():
+def suggestion_message(request):
     with open('resources/suggestion_template.json') as json_file:
         message = json.load(json_file)
         slack_client.post_message(message)
+    return ''
 
 
 def find_suggestions(request):
@@ -44,7 +45,7 @@ def find_suggestions(request):
     restaurants = places_client.find_suggestion(payload['value'])
     mongo_client.save_restaurants_info(restaurants)
     options = list({'text': restaurant['name'], 'value': restaurant['place_id']} for restaurant in restaurants['results'])
-    return {'options': options}
+    return jsonify({'options': options})
 
 
 @app.route('/find_suggestions', methods=['POST'])

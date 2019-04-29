@@ -1,6 +1,6 @@
 {
-	"channel": "@taco",
-    "text": "Hi, it's time to choose what to eat, else I will pick something random.",
+	"channel": "#lunch",
+    "text": "Hi, it's time to choose what to eat. Else I will pick something random.",
     "response_type": "in_channel",
     "attachments": [
         {
