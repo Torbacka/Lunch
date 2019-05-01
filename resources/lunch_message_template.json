@@ -1,28 +1,5 @@
 {
 	"channel": "#lunch",
-	"attachments": [
-		{
-			"color": "3AA3E3",
-			"fallback": "Lunch!",
-			"fields": [
-			],
-			"id": 1,
-			"text": "Lunch!"
-		},
-		{
-			"actions": [
-			],
-			"callback_id": "vote",
-			"color": "3AA3E3",
-			"fallback": "Something wrong happend",
-			"id": 2,
-			"text": "Choose a resturant"
-		}
-	],
-	"bot_id": "BHJSDJ9S9",
-	"subtype": "bot_message",
-	"text": "What should we eat today??",
-	"ts": "1554199404.002300",
-	"type": "message",
-	"username": "Lunch"
+	"blocks": [
+	]
 }

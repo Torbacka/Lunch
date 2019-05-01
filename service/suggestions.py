@@ -1,45 +1,60 @@
 import json
 from datetime import date
 
-from service import mongo_client, slack_client
+from service.client import mongo_client, slack_client
 
 
 def push_suggestions():
     votes = mongo_client.get_votes(date.today())
     with open('resources/lunch_message_template.json') as json_file:
         lunch_message = json.load(json_file)
-        attachments = lunch_message['attachments']
-        vote_index = 1
+        blocks = lunch_message['blocks']
         for index, vote in enumerate(votes['suggestions'], start=1):
-            attachments[0]['fields'].append({
-                'short': False,
-                'title': " {}. {} ({})".format(index, vote['name'], vote['rating']),
-                'value': "<{}>".format(vote['url'])
-            })
-            add_actions(attachments, index, vote_index)
+            blocks.append(add_restaurant_text(index, vote['name'], vote['rating']))
+            blocks.append(add_vote_section(vote['url']))
         slack_client.post_message(lunch_message)
 
 
-def add_actions(attachments, index, vote_index):
-    attachments[vote_index]['actions'].append({
-        "id": index,
-        "name": "vote",
-        "style": "",
-        "text": index,
-        "type": "button",
-        "value": index
-    })
-    if index % 5 == 0:
-        vote_index += 1
-        attachments.append({
-            "actions": [
-            ],
-            "callback_id": "vote",
-            "color": "3AA3E3",
-            "fallback": "Something wrong happened",
-            "id": 2,
-            "text": "Choose a restaurant"
-        })
+def add_restaurant_text(index, name, rating):
+    return {
+        "type": "section",
+        "text": {
+            "type": "mrkdwn",
+            "text": f"{index}. {name} *{rating}*:star:"
+        },
+        "accessory": {
+            "type": "button",
+            "text": {
+                "type": "plain_text",
+                "text": "vote",
+                "emoji": True
+            },
+            "value": f"{index}"
+        }
+    }
+
+
+def add_vote_section(url):
+    return [{
+        "type": "context",
+        "elements": [
+            {
+                "type": "plain_text",
+                "emoji": True,
+                "text": "No votes"
+            }
+        ]
+    }, {
+        "type": "divider"
+    }, {
+        "type": "context",
+        "elements": [
+            {
+                "type": "mrkdwn",
+                "text": f"For more info: {url}"
+            }
+        ]
+    }]
 
 
 def suggest(place_id):
