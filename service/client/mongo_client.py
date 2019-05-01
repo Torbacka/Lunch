@@ -4,7 +4,7 @@ from datetime import date
 import pymongo as pymongo
 from pymongo import ReturnDocument
 
-from service import places_client
+from service.client import places_client
 
 password = os.environ['MONGO_PASSWORD']
 
@@ -28,6 +28,7 @@ def update_vote(choice, user_id):
                                  .format(password))
     collection = client['lunch']['votes']
     vote = collection.find_one({'date': date.today().isoformat()})
+    # Remove vote
     if user_id in vote['suggestions'][choice]['votes']:
         return collection.find_one_and_update(
             filter={'date': date.today().isoformat()},
@@ -36,6 +37,7 @@ def update_vote(choice, user_id):
             },
             return_document=ReturnDocument.AFTER
         )
+    # Add vote
     else:
         return collection.find_one_and_update(
             filter={'date': date.today().isoformat()},
