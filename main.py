@@ -2,7 +2,8 @@ import json
 
 from flask import request, Flask, jsonify
 
-from service import voter, suggestions, places_client, mongo_client, slack_client
+from service import voter, suggestions
+from service.client import places_client, mongo_client, slack_client
 
 app = Flask(__name__)
 
@@ -17,7 +18,8 @@ def action(request):
         <http://flask.pocoo.org/docs/1.0/api/#flask.Flask.make_response>.
     """
     payload = json.loads(request.form["payload"])
-    if payload['actions'][0]['name'] == 'suggest':
+    print(json.dumps(payload))
+    if payload['actions'][0]['value'] == 'suggest':
         suggestions.suggest(payload['actions'][0]['selected_options'][0]['value'])
     else:
         voter.vote(payload)
@@ -57,6 +59,12 @@ def push_slack():
 @app.route('/lunch_message')
 def send_lunch_message():
     lunch_message(request)
+    return ''
+
+
+@app.route('/suggestion_message')
+def send_suggestion_message():
+    suggestion_message(request)
     return ''
 
 
