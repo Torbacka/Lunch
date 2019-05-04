@@ -13,7 +13,7 @@
     "type": "section",
     "text": {
       "type": "mrkdwn",
-      "text": "1. Mea thai *3.8*:star:"
+      "text": "Mea thai *3.8*:star:"
     },
     "accessory": {
       "type": "button",
@@ -47,6 +47,44 @@
         "type": "plain_text",
         "emoji": true,
         "text": "3 votes"
+      }
+    ]
+  },
+  {
+    "type": "context",
+    "elements": [
+      {
+        "type": "mrkdwn",
+        "text": "For more info: https://maps.google.com/?cid=7504835437830291930"
+      }
+    ]
+  },
+  {
+    "type": "divider"
+  },
+  {
+    "type": "section",
+    "text": {
+      "type": "mrkdwn",
+      "text": "Pizza *3.8*:star:"
+    },
+    "accessory": {
+      "type": "button",
+      "text": {
+        "type": "plain_text",
+        "text": "vote",
+        "emoji": true
+      },
+      "value": "click_me_123"
+    }
+  },
+  {
+    "type": "context",
+    "elements": [
+      {
+        "type": "image",
+        "image_url": "https://api.slack.com/img/blocks/bkb_template_images/profile_1.png",
+        "alt_text": "Taco"
       }
     ]
   },
