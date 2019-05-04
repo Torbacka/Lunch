@@ -11,7 +11,8 @@ def push_suggestions():
         blocks = lunch_message['blocks']
         for index, vote in enumerate(votes['suggestions'], start=1):
             blocks.append(add_restaurant_text(index, vote['name'], vote['rating']))
-            blocks.append(add_vote_section(vote['url']))
+            blocks.extend(add_vote_section(vote['url']))
+        print(json.dumps(lunch_message))
         slack_client.post_message(lunch_message)
 
 
@@ -20,7 +21,7 @@ def add_restaurant_text(index, name, rating):
         "type": "section",
         "text": {
             "type": "mrkdwn",
-            "text": f"{index}. {name} *{rating}*:star:"
+            "text": f":knife_fork_plate: *{name}* {rating}:star:"
         },
         "accessory": {
             "type": "button",
@@ -44,9 +45,7 @@ def add_vote_section(url):
                 "text": "No votes"
             }
         ]
-    }, {
-        "type": "divider"
-    }, {
+    },  {
         "type": "context",
         "elements": [
             {
@@ -54,6 +53,8 @@ def add_vote_section(url):
                 "text": f"For more info: {url}"
             }
         ]
+    }, {
+        "type": "divider"
     }]
 
 

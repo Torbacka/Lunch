@@ -1,5 +1,15 @@
 {
-	"channel": "#lunch",
-	"blocks": [
-	]
+  "channel": "@taco",
+  "blocks": [
+    {
+      "type": "section",
+      "text": {
+        "type": "mrkdwn",
+        "text": "*What should we eat today?*"
+      }
+    },
+    {
+      "type": "divider"
+    }
+  ]
 }
