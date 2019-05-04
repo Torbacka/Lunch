@@ -19,8 +19,8 @@ def action(request):
     """
     payload = json.loads(request.form["payload"])
     print(json.dumps(payload))
-    if payload['actions'][0]['value'] == 'suggest':
-        suggestions.suggest(payload['actions'][0]['selected_options'][0]['value'])
+    if payload['actions'][0]['type'] == 'external_select':
+        suggestions.suggest(payload['actions'][0]['selected_option']['value'])
     else:
         voter.vote(payload)
     return ''
@@ -44,16 +44,25 @@ def suggestion_message(request):
 
 def find_suggestions(request):
     payload = json.loads(request.form["payload"])
+    print(json.dumps(payload))
     restaurants = places_client.find_suggestion(payload['value'])
     mongo_client.save_restaurants_info(restaurants)
-    options = list({'text': restaurant['name'], 'value': restaurant['place_id']} for restaurant in restaurants['results'])
+    options = list(
+        {
+            'text': {
+                "type": "plain_text",
+                "text": restaurant['name']
+            },
+            'value': restaurant['place_id']
+        } for restaurant in restaurants['results'])
     return jsonify({'options': options})
 
 
 @app.route('/find_suggestions', methods=['POST'])
 def push_slack():
     ret = find_suggestions(request)
-    return jsonify(ret)
+    print(ret)
+    return ret
 
 
 @app.route('/lunch_message')
