@@ -5,7 +5,7 @@
       "type": "section",
       "text": {
         "type": "mrkdwn",
-        "text": "Hi, what do you want to today"
+        "text": "Hi, where do you want to eat today?"
       },
       "accessory": {
         "type": "external_select",
