@@ -6,9 +6,9 @@ from service.client import mongo_client, slack_client
 
 
 def vote(payload):
-    choice = int(payload['actions'][0]['value']) - 1
+    place_id = payload['actions'][0]['value']
     user_id = payload['user']['id']
-    votes = mongo_client.update_vote(choice, user_id)
+    votes = mongo_client.update_vote(place_id, user_id)
 
     blocks = payload['message']['blocks']
     return_message = dict()

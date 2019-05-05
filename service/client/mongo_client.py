@@ -16,10 +16,10 @@ def get_votes(date_input):
     return collection.find_one({'date': date_input.isoformat()})
 
 
-def update_vote(choice, user_id):
+def update_vote(place_id, user_id):
     """
     Update the user_id choice, if the user_id already exist in the choice it will be removed.
-    :param choice: What choice the user made
+    :param place_id: What restaurant the user picked
     :param user_id: slack user_id
     """
     client = pymongo.MongoClient(f"mongodb://root:{password}@hack-for-sweden-shard-00-00-7vayj.mongodb.net:27017,hack-for-sweden-shard-00-01-7vayj.mongodb.net:27017,"
@@ -27,11 +27,11 @@ def update_vote(choice, user_id):
     collection = client['lunch']['votes']
     vote = collection.find_one({'date': date.today().isoformat()})
     # Remove vote
-    if user_id in vote['suggestions'][choice]['votes']:
+    if user_id in vote['suggestions'][place_id]['votes']:
         return collection.find_one_and_update(
             filter={'date': date.today().isoformat()},
             update={
-                "$pull": {"suggestions.{}.votes".format(choice): user_id}
+                "$pull": {f"suggestions.{place_id}.votes": user_id}
             },
             return_document=ReturnDocument.AFTER
         )
@@ -40,7 +40,7 @@ def update_vote(choice, user_id):
         return collection.find_one_and_update(
             filter={'date': date.today().isoformat()},
             update={
-                "$addToSet": {"suggestions.{}.votes".format(choice): user_id}
+                "$addToSet": {f"suggestions.{place_id}.votes": user_id}
             },
             return_document=ReturnDocument.AFTER
         )
@@ -56,13 +56,15 @@ def update_suggestions(place_id):
         restaurant = add_restaurant_url(place_id, restaurant, restaurant_collection)
 
     suggestion = {
-        'price_level': restaurant.get("price_level", ''),
-        'rating': restaurant.get('rating', ''),
-        'name': restaurant['name'],
-        'place_id': restaurant['place_id'],
-        'url': restaurant['url'],
-        'website': restaurant.get('website', ''),
-        'votes': list(),
+        f'{restaurant["place_id"]}': {
+            'price_level': restaurant.get("price_level", ''),
+            'rating': restaurant.get('rating', ''),
+            'name': restaurant['name'],
+            'place_id': restaurant['place_id'],
+            'url': restaurant['url'],
+            'website': restaurant.get('website', ''),
+            'votes': list(),
+        }
     }
     votes_collection.find_one_and_update(
         filter={'date': date.today().isoformat()},
