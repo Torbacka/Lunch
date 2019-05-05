@@ -27,7 +27,7 @@ def update_vote(place_id, user_id):
     collection = client['lunch']['votes']
     vote = collection.find_one({'date': date.today().isoformat()})
     # Remove vote
-    if user_id in vote['suggestions'][place_id]['votes']:
+    if user_id in vote['suggestions'][f'{place_id}']['votes']:
         return collection.find_one_and_update(
             filter={'date': date.today().isoformat()},
             update={
@@ -56,21 +56,19 @@ def update_suggestions(place_id):
         restaurant = add_restaurant_url(place_id, restaurant, restaurant_collection)
 
     suggestion = {
-        f'{restaurant["place_id"]}': {
-            'price_level': restaurant.get("price_level", ''),
-            'rating': restaurant.get('rating', ''),
-            'name': restaurant['name'],
-            'place_id': restaurant['place_id'],
-            'url': restaurant['url'],
-            'website': restaurant.get('website', ''),
-            'votes': list(),
-        }
+        'price_level': restaurant.get("price_level", ''),
+        'rating': restaurant.get('rating', ''),
+        'name': restaurant['name'],
+        'place_id': restaurant['place_id'],
+        'url': restaurant['url'],
+        'website': restaurant.get('website', ''),
+        'votes': list(),
     }
+
     votes_collection.find_one_and_update(
         filter={'date': date.today().isoformat()},
         update={
-            "$set": {'date': date.today().isoformat()},
-            "$addToSet": {"suggestions": suggestion},
+            "$set": {'date': date.today().isoformat(), f'suggestions.{restaurant["place_id"]}': suggestion}
         },
         upsert=True
     )

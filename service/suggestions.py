@@ -9,7 +9,7 @@ def push_suggestions():
     with open('resources/lunch_message_template.json') as json_file:
         lunch_message = json.load(json_file)
         blocks = lunch_message['blocks']
-        for index, vote in enumerate(votes['suggestions'], start=1):
+        for key, vote in votes['suggestions'].items():
             blocks.append(add_restaurant_text(vote['place_id'], vote['name'], vote['rating']))
             blocks.extend(add_vote_section(vote['url']))
         print(json.dumps(lunch_message))
@@ -27,7 +27,7 @@ def add_restaurant_text(place_id, name, rating):
             "type": "button",
             "text": {
                 "type": "plain_text",
-                "text": "vote",
+                "text": f"{place_id}",
                 "emoji": True
             },
             "value": f"{place_id}"

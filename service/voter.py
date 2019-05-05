@@ -21,7 +21,8 @@ def vote(payload):
 
 
 def update_message(blocks, votes):
-    for index, suggestion in enumerate(votes['suggestions'], start=0):
+    index = 0
+    for key, suggestion in votes['suggestions'].items():
         votes = add_user_votes(suggestion)
         number_of_votes = len(suggestion['votes'])
         votes.append({
@@ -30,14 +31,9 @@ def update_message(blocks, votes):
             "text": f"{number_of_votes if number_of_votes > 0 else 'No'} {'votes' if number_of_votes != 1 else 'vote'}"
         })
         blocks[index * 4 + 3]['elements'] = votes
+        index += 1
 
-    sorted_blocks = sort_message(blocks)
-    index = 1
-    for block in sorted_blocks:
-        if 'accessory' in block:
-            block['accessory']['value'] = f"{index}"
-            index += 1
-    return sorted_blocks
+    return blocks
 
 
 def sort_message(blocks):
