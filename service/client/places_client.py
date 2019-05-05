@@ -1,6 +1,6 @@
 import os
 
-import requests
+from main import session
 
 password = os.environ['PLACES_PASSWORD']
 
@@ -13,7 +13,7 @@ def find_suggestion(search_string):
         'type': 'restaurant',
         'key': password
     }
-    return requests.get("https://maps.googleapis.com/maps/api/place/nearbysearch/json", params=params).json()
+    return session.get("https://maps.googleapis.com/maps/api/place/nearbysearch/json", params=params).json()
 
 
 def get_details(place_id):
@@ -21,7 +21,7 @@ def get_details(place_id):
         'placeid': place_id,
         'key': password
     }
-    return requests.get("https://maps.googleapis.com/maps/api/place/details/json", params=params).json()
+    return session.get("https://maps.googleapis.com/maps/api/place/details/json", params=params).json()
 
 
 if __name__ == '__main__':

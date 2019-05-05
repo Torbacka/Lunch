@@ -62,8 +62,8 @@ def add_user_votes(suggestion):
     for user_id in suggestion['votes']:
         profile = slack_client.get_profile_pic(user_id)
         votes.append({
-            'type': 'image',
-            'image_url': profile['image_24'],
-            'alt_text': f'{profile["display_name"]}'
+            "type": "plain_text",
+            "text": f"@{user_id}",
+            "emoji": True
         })
     return votes
