@@ -10,9 +10,8 @@ password = os.environ['MONGO_PASSWORD']
 
 
 def get_votes(date_input):
-    client = pymongo.MongoClient("mongodb://root:{}@hack-for-sweden-shard-00-00-7vayj.mongodb.net:27017,hack-for-sweden-shard-00-01-7vayj.mongodb.net:27017,"
-                                 "hack-for-sweden-shard-00-02-7vayj.mongodb.net:27017/test?ssl=true&replicaSet=hack-for-sweden-shard-0&authSource=admin&retryWrites=true"
-                                 .format(password))
+    client = pymongo.MongoClient(f"mongodb://root:{password}@hack-for-sweden-shard-00-00-7vayj.mongodb.net:27017,hack-for-sweden-shard-00-01-7vayj.mongodb.net:27017,"
+                                 "hack-for-sweden-shard-00-02-7vayj.mongodb.net:27017/test?ssl=true&replicaSet=hack-for-sweden-shard-0&authSource=admin&retryWrites=true")
     collection = client['lunch']['votes']
     return collection.find_one({'date': date_input.isoformat()})
 
@@ -23,9 +22,8 @@ def update_vote(choice, user_id):
     :param choice: What choice the user made
     :param user_id: slack user_id
     """
-    client = pymongo.MongoClient("mongodb://root:{}@hack-for-sweden-shard-00-00-7vayj.mongodb.net:27017,hack-for-sweden-shard-00-01-7vayj.mongodb.net:27017,"
-                                 "hack-for-sweden-shard-00-02-7vayj.mongodb.net:27017/test?ssl=true&replicaSet=hack-for-sweden-shard-0&authSource=admin&retryWrites=true"
-                                 .format(password))
+    client = pymongo.MongoClient(f"mongodb://root:{password}@hack-for-sweden-shard-00-00-7vayj.mongodb.net:27017,hack-for-sweden-shard-00-01-7vayj.mongodb.net:27017,"
+                                 "hack-for-sweden-shard-00-02-7vayj.mongodb.net:27017/test?ssl=true&replicaSet=hack-for-sweden-shard-0&authSource=admin&retryWrites=true")
     collection = client['lunch']['votes']
     vote = collection.find_one({'date': date.today().isoformat()})
     # Remove vote
@@ -49,9 +47,8 @@ def update_vote(choice, user_id):
 
 
 def update_suggestions(place_id):
-    client = pymongo.MongoClient("mongodb://root:{}@hack-for-sweden-shard-00-00-7vayj.mongodb.net:27017,hack-for-sweden-shard-00-01-7vayj.mongodb.net:27017,"
-                                 "hack-for-sweden-shard-00-02-7vayj.mongodb.net:27017/test?ssl=true&replicaSet=hack-for-sweden-shard-0&authSource=admin&retryWrites=true"
-                                 .format(password))
+    client = pymongo.MongoClient(f"mongodb://root:{password}@hack-for-sweden-shard-00-00-7vayj.mongodb.net:27017,hack-for-sweden-shard-00-01-7vayj.mongodb.net:27017,"
+                                 "hack-for-sweden-shard-00-02-7vayj.mongodb.net:27017/test?ssl=true&replicaSet=hack-for-sweden-shard-0&authSource=admin&retryWrites=true")
     votes_collection = client['lunch']['votes']
     restaurant_collection = client['lunch']['restaurants']
     restaurant = restaurant_collection.find_one({"place_id": place_id})
@@ -93,9 +90,8 @@ def add_restaurant_url(place_id, restaurant, restaurant_collection):
 
 
 def save_restaurants_info(restaurants):
-    client = pymongo.MongoClient("mongodb://root:{}@hack-for-sweden-shard-00-00-7vayj.mongodb.net:27017,hack-for-sweden-shard-00-01-7vayj.mongodb.net:27017,"
-                                 "hack-for-sweden-shard-00-02-7vayj.mongodb.net:27017/test?ssl=true&replicaSet=hack-for-sweden-shard-0&authSource=admin&retryWrites=true"
-                                 .format(password))
+    client = pymongo.MongoClient(f"mongodb://root:{password}@hack-for-sweden-shard-00-00-7vayj.mongodb.net:27017,hack-for-sweden-shard-00-01-7vayj.mongodb.net:27017,"
+                                 "hack-for-sweden-shard-00-02-7vayj.mongodb.net:27017/test?ssl=true&replicaSet=hack-for-sweden-shard-0&authSource=admin&retryWrites=true")
     collection = client['lunch']['restaurants']
     for restaurant in restaurants['results']:
         collection.update({'place_id': restaurant['place_id']}

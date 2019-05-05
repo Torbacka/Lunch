@@ -10,13 +10,13 @@ def push_suggestions():
         lunch_message = json.load(json_file)
         blocks = lunch_message['blocks']
         for index, vote in enumerate(votes['suggestions'], start=1):
-            blocks.append(add_restaurant_text(index, vote['name'], vote['rating']))
+            blocks.append(add_restaurant_text(vote['place_id'], vote['name'], vote['rating']))
             blocks.extend(add_vote_section(vote['url']))
         print(json.dumps(lunch_message))
         slack_client.post_message(lunch_message)
 
 
-def add_restaurant_text(index, name, rating):
+def add_restaurant_text(place_id, name, rating):
     return {
         "type": "section",
         "text": {
@@ -30,7 +30,7 @@ def add_restaurant_text(index, name, rating):
                 "text": "vote",
                 "emoji": True
             },
-            "value": f"{index}"
+            "value": f"{place_id}"
         }
     }
 
