@@ -7,7 +7,6 @@ from service import voter, suggestions
 from service.client import places_client, mongo_client, slack_client
 
 app = Flask(__name__)
-session = requests.Session()
 
 
 def action(request):

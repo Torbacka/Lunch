@@ -4,6 +4,8 @@ from functools import reduce
 
 from service.client import mongo_client, slack_client
 
+image = dict()
+
 
 def vote(payload):
     place_id = payload['actions'][0]['value']
@@ -22,6 +24,7 @@ def vote(payload):
 
 def update_message(blocks, votes):
     index = 0
+
     for key, suggestion in votes['suggestions'].items():
         votes = add_user_votes(suggestion)
         number_of_votes = len(suggestion['votes'])
@@ -60,10 +63,15 @@ def group_suggestions(suggestions):
 def add_user_votes(suggestion):
     votes = []
     for user_id in suggestion['votes']:
-        profile = slack_client.get_profile_pic(user_id)
+        if user_id not in image:
+            profile = slack_client.get_profile_pic(user_id)
+            image[user_id] = {
+                'url': profile['image_24'],
+                'name': profile["display_name"]
+            }
         votes.append({
-            "type": "plain_text",
-            "text": f"@{user_id}",
-            "emoji": True
+            'type': 'image',
+            'image_url': f"{image[user_id]['url']}",
+            'alt_text': f"{image[user_id]['name']}"
         })
     return votes

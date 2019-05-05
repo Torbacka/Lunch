@@ -2,11 +2,11 @@ import os
 
 import requests
 
-from main import session
 
 slack_url = "https://slack.com/api/"
 slack_token = os.environ['SLACK_TOKEN']
 bot_token = os.environ['BOT_TOKEN']
+session = requests.Session()
 
 
 def get_headers(token):

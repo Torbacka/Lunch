@@ -27,7 +27,7 @@ def add_restaurant_text(place_id, name, rating):
             "type": "button",
             "text": {
                 "type": "plain_text",
-                "text": f"{place_id}",
+                "text": "vote",
                 "emoji": True
             },
             "value": f"{place_id}"

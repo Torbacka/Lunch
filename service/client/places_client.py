@@ -1,8 +1,9 @@
 import os
 
-from main import session
+import requests
 
 password = os.environ['PLACES_PASSWORD']
+session = requests.Session()
 
 
 def find_suggestion(search_string):
