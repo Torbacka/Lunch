@@ -1,11 +1,11 @@
 {
-  "channel": "@taco",
+  "channel": "#lunch",
   "blocks": [
     {
       "type": "section",
       "text": {
         "type": "mrkdwn",
-        "text": "Hi, where do you want to eat today?"
+        "text": "Hi, where do you want to eat?"
       },
       "accessory": {
         "type": "external_select",
