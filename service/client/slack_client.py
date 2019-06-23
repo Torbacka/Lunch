@@ -2,7 +2,6 @@ import os
 
 import requests
 
-
 slack_url = "https://slack.com/api/"
 slack_token = os.environ['SLACK_TOKEN']
 bot_token = os.environ['BOT_TOKEN']
@@ -16,8 +15,15 @@ def get_headers(token):
     }
 
 
+def get_from_headers(token):
+    return {
+        'Content-Type': 'application/x-www-form-urlencoded;charset=utf-8',
+        'Authorization': f'Bearer {token}'
+    }
+
+
 def get_profile_pic(user_id):
-    response = session.post("https://slack.com/api/users.profile.get", headers=get_headers(slack_token), json={'user': user_id})
+    response = session.post("https://slack.com/api/users.profile.get", headers=get_from_headers(slack_token), data={'user': user_id})
     print("Status code: {}   response: {} ".format(response.status_code, response.json()))
     return response.json()['profile']
 
