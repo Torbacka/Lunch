@@ -74,6 +74,22 @@ def update_suggestions(place_id):
     )
 
 
+def add_emoji(place_ids, emoji_string):
+    client = pymongo.MongoClient(f"mongodb://root:{password}@hack-for-sweden-shard-00-00-7vayj.mongodb.net:27017,hack-for-sweden-shard-00-01-7vayj.mongodb.net:27017,"
+                                 "hack-for-sweden-shard-00-02-7vayj.mongodb.net:27017/test?ssl=true&replicaSet=hack-for-sweden-shard-0&authSource=admin&retryWrites=true")
+    restaurant_collection = client['lunch']['restaurants']
+    restaurant = restaurant_collection.update_many(
+        filter={'place_id': {"$in": place_ids}},
+        update={
+            "$set": {
+                'emoji': emoji_string,
+            }
+        }
+    )
+    print(restaurant)
+    return restaurant
+
+
 def add_restaurant_url(place_id, restaurant, restaurant_collection):
     restaurant_details = places_client.get_details(restaurant['place_id'])
     restaurant = restaurant_collection.find_one_and_update(

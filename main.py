@@ -1,10 +1,10 @@
 import json
 
-import requests
 from flask import request, Flask, jsonify
 
 from service import voter, suggestions
 from service.client import places_client, mongo_client, slack_client
+from service.emoji import search_and_update_emoji
 
 app = Flask(__name__)
 
@@ -59,6 +59,11 @@ def find_suggestions(request):
     return jsonify({'options': options})
 
 
+def emoji():
+    search_and_update_emoji()
+    return ''
+
+
 @app.route('/find_suggestions', methods=['POST'])
 def push_slack():
     ret = find_suggestions(request)
@@ -81,6 +86,12 @@ def send_suggestion_message():
 @app.route('/action', methods=['POST'])
 def local_action():
     action(request)
+    return ''
+
+
+@app.route('/emoji', methods=['GET'])
+def local_emoji():
+    emoji()
     return ''
 
 
