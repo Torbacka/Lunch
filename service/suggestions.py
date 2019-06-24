@@ -10,18 +10,21 @@ def push_suggestions():
         lunch_message = json.load(json_file)
         blocks = lunch_message['blocks']
         for key, vote in votes['suggestions'].items():
-            blocks.append(add_restaurant_text(vote['place_id'], vote['name'], vote['rating']))
+            print(vote)
+            blocks.append(add_restaurant_text(vote['place_id'], vote.get('emoji', None), vote['name'], vote['rating']))
             blocks.extend(add_vote_section(vote['url']))
         print(json.dumps(lunch_message))
         slack_client.post_message(lunch_message)
 
 
-def add_restaurant_text(place_id, name, rating):
+def add_restaurant_text(place_id, emoji, name, rating):
+    if emoji is None:
+        emoji = 'knife_fork_plate'
     return {
         "type": "section",
         "text": {
             "type": "mrkdwn",
-            "text": f":knife_fork_plate: *{name}* {rating}:star:"
+            "text": f":{emoji}: *{name}* {rating}:star:"
         },
         "accessory": {
             "type": "button",
@@ -45,7 +48,7 @@ def add_vote_section(url):
                 "text": "No votes"
             }
         ]
-    },  {
+    }, {
         "type": "context",
         "elements": [
             {

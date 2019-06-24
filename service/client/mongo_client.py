@@ -54,7 +54,7 @@ def update_suggestions(place_id):
     restaurant = restaurant_collection.find_one({"place_id": place_id})
     if 'url' not in restaurant:
         restaurant = add_restaurant_url(place_id, restaurant, restaurant_collection)
-
+    print(restaurant)
     suggestion = {
         'price_level': restaurant.get("price_level", ''),
         'rating': restaurant.get('rating', ''),
@@ -62,9 +62,10 @@ def update_suggestions(place_id):
         'place_id': restaurant['place_id'],
         'url': restaurant['url'],
         'website': restaurant.get('website', ''),
+        'emoji': restaurant.get('emoji', None),
         'votes': list(),
     }
-
+    print(suggestion)
     votes_collection.find_one_and_update(
         filter={'date': date.today().isoformat()},
         update={
