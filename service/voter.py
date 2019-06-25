@@ -10,6 +10,7 @@ image = dict()
 def vote(payload):
     place_id = payload['actions'][0]['value']
     user_id = payload['user']['id']
+    print(place_id, user_id)
     votes = mongo_client.update_vote(place_id, user_id)
 
     blocks = payload['message']['blocks']
@@ -67,11 +68,12 @@ def add_user_votes(suggestion):
             profile = slack_client.get_profile_pic(user_id)
             image[user_id] = {
                 'url': profile['image_24'],
-                'name': profile["display_name"]
+                'name': profile["display_name"],
+                'real_name': profile['real_name']
             }
         votes.append({
             'type': 'image',
             'image_url': f"{image[user_id]['url']}",
-            'alt_text': f"{image[user_id]['name']}"
+            'alt_text': f"{image[user_id]['name'] if image[user_id]['name'] != '' else image[user_id]['real_name']}"
         })
     return votes
