@@ -1,3 +1,4 @@
+import json
 import os
 
 import requests
@@ -35,4 +36,4 @@ def post_message(data):
 
 def update_message(data):
     response = session.post("https://slack.com/api/chat.update", headers=get_headers(bot_token), json=data)
-    print("Status code: {}   response: {} ".format(response.status_code, response.json()))
+    print("Slack response status code: {}   response: {} ".format(response.status_code, response.json()))
