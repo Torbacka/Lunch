@@ -1,53 +1,15 @@
 {
-  "_id": "5cb32e2505320cd8c1fb9d3a"
-  ,
-  "geometry": {
-    "location": {
-      "lat": 59.3343398,
-      "lng": 18.058366
-    },
-    "viewport": {
-      "northeast": {
-        "lat": 59.33564742989272,
-        "lng": 18.05975722989272
-      },
-      "southwest": {
-        "lat": 59.33294777010727,
-        "lng": 18.05705757010728
-      }
-    }
-  },
+  "geometry": ,
   "icon": "https://maps.gstatic.com/mapfiles/place_api/icons/restaurant-71.png",
-  "id": "83c4810a227c0f5413424fc9bcc593e7972db0ab",
-  "name": "China Wang",
-  "opening_hours": {
-    "open_now": true
-  },
-  "photos": [
-    {
-      "height": 2160,
-      "html_attributions": [
-        "<a href=\"https://maps.google.com/maps/contrib/108005223403066522599/photos\">Stanislav Khromov</a>"
-      ],
-      "photo_reference": "CmRaAAAApDWGE2Ds-boicXd1iqyzhsvfSst-OOFT41hvI_Ytvy5XFUK5rLSKC9oQok503sFywylRVAuDF6eWOZyd0YXiP58F36TIAf3m8nCj-phqupPhEvF1IV5vKMQa8J9u-iP4EhBzPfcVy8NC4btsxGhfDVaaGhTti7mGlhjb7hAUrn9dtL5oBiLesQ",
-      "width": 3840
-    }
-  ],
-  "place_id": "ChIJ0QXlLmedX0YRwMASZ96Jliw",
-  "plus_code": {
-    "compound_code": "83M5+P8 Stockholm",
-    "global_code": "9FFW83M5+P8"
-  },
-  "price_level": 2,
+  "id": "8dd3be76faf68c74a3c1b8cdc5e541a1e6f1b15b",
+  "name": "Tre Kronor",
+  "opening_hours":,
+  "photos": ,
+  "place_id": "ChIJR4pFcGidX0YRspb4Pd8sS7Y",
+  "plus_code": ,
   "rating": 3.7,
-  "reference": "ChIJ0QXlLmedX0YRwMASZ96Jliw",
-  "scope": "GOOGLE",
-  "types": [
-    "restaurant",
-    "point_of_interest",
-    "food",
-    "establishment"
-  ],
-  "user_ratings_total": 283,
-  "vicinity": "Kungsgatan 62, Stockholm"
+  "reference": "ChIJR4pFcGidX0YRspb4Pd8sS7Y",
+  "types": ,
+  "user_ratings_total": 61,
+  "vicinity": "Döbelnsgatan 6, Stockholm"
 }
