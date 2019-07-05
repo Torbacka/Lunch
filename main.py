@@ -9,16 +9,16 @@ from service.emoji import search_and_update_emoji
 app = Flask(__name__)
 
 
-def action(request):
+def action(data):
     """Seeder cloud function.
     Args:
-        request (flask.Request): Contains an slack action that will be used to update the lunch vote.
+        data (flask.Request): Contains an slack action that will be used to update the lunch vote.
     Returns:
         The response text, or any set of values that can be turned into a
         Response object using `make_response`
         <http://flask.pocoo.org/docs/1.0/api/#flask.Flask.make_response>.
     """
-    payload = json.loads(request.form["payload"])
+    payload = json.loads(data.form["payload"])
     print(json.dumps(payload))
     if payload['actions'][0]['type'] == 'external_select':
         suggestions.suggest(payload['actions'][0]['selected_option']['value'])
@@ -27,24 +27,23 @@ def action(request):
     return ''
 
 
-def lunch_message(request):
+def lunch_message():
     """
     Lunch message cloud functions, used to construct and push lunch message to slack.
-    :param request: GET request is just used to trigger the function
     :return: Returns http status codes depending on the error.
     """
     suggestions.push_suggestions()
 
 
-def suggestion_message(request):
+def suggestion_message():
     with open('resources/suggestion_template.json') as json_file:
         message = json.load(json_file)
         slack_client.post_message(message)
     return ''
 
 
-def find_suggestions(request):
-    payload = json.loads(request.form["payload"])
+def find_suggestions(data):
+    payload = json.loads(data.form["payload"])
     print(json.dumps(payload))
     restaurants = places_client.find_suggestion(payload['value'])
     mongo_client.save_restaurants_info(restaurants)
@@ -73,13 +72,13 @@ def push_slack():
 
 @app.route('/lunch_message')
 def send_lunch_message():
-    lunch_message(request)
+    lunch_message()
     return ''
 
 
 @app.route('/suggestion_message')
 def send_suggestion_message():
-    suggestion_message(request)
+    suggestion_message()
     return ''
 
 
