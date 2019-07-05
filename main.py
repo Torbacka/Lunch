@@ -63,6 +63,12 @@ def emoji():
     return ''
 
 
+def closing_message():
+    with open('resources/food_emoji.json') as json_file:
+        closing_message = json.load(json_file)
+        slack_client.post_message(closing_message)
+
+
 @app.route('/find_suggestions', methods=['POST'])
 def push_slack():
     ret = find_suggestions(request)
@@ -91,6 +97,18 @@ def local_action():
 @app.route('/emoji', methods=['GET'])
 def local_emoji():
     emoji()
+    return ''
+
+
+@app.route('/closing', methods=['GET'])
+def local_closing_message():
+    closing_message()
+    return ''
+
+
+@app.route('/closing', methods=['GET'])
+def local_closing_message():
+    closing_message()
     return ''
 
 
