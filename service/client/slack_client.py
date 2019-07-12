@@ -30,8 +30,14 @@ def get_profile_pic(user_id):
 
 
 def post_message(data):
+    """
+    Method to post data to slack
+    :param data: The message that should be send to slack
+    :return: Returning the unique id of the message.
+    """
     response = session.post("https://slack.com/api/chat.postMessage", headers=get_headers(bot_token), json=data)
     print("Status code: {}   response: {} ".format(response.status_code, response.json()))
+    return response.json()['ts']
 
 
 def update_message(data):

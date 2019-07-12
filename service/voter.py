@@ -1,5 +1,6 @@
 import json
 import operator
+from datetime import date
 from functools import reduce
 
 from service.client import mongo_client, slack_client
@@ -77,3 +78,9 @@ def add_user_votes(suggestion):
             'alt_text': f"{image[user_id]['name'] if image[user_id]['name'] != '' else image[user_id]['real_name']}"
         })
     return votes
+
+
+def close_vote():
+    vote = mongo_client.get_vote(date.today())
+    ts = vote['ts']
+    slack_client.get

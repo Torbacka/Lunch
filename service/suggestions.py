@@ -5,16 +5,17 @@ from service.client import mongo_client, slack_client
 
 
 def push_suggestions():
-    votes = mongo_client.get_votes(date.today())
+    vote = mongo_client.get_vote(date.today())
     with open('resources/lunch_message_template.json') as json_file:
         lunch_message = json.load(json_file)
         blocks = lunch_message['blocks']
-        for key, vote in votes['suggestions'].items():
+        for key, vote in vote['suggestions'].items():
             print(vote)
             blocks.append(add_restaurant_text(vote['place_id'], vote.get('emoji', None), vote['name'], vote['rating']))
             blocks.extend(add_vote_section(vote['url']))
         print(json.dumps(lunch_message))
-        slack_client.post_message(lunch_message)
+        ts = slack_client.post_message(lunch_message)
+        mongo_client.add_message_id_to_vote(ts)
 
 
 def add_restaurant_text(place_id, emoji, name, rating):

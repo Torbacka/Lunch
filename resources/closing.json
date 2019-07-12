@@ -1,0 +1,12 @@
+{
+  "channel": "#lunch",
+  "blocks": [
+    {
+      "type": "section",
+      "text": {
+        "type": "mrkdwn",
+        "text": "*Vote is closing in 3 min @here!*"
+      }
+    }
+  ]
+}
