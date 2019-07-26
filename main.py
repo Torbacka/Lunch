@@ -48,11 +48,12 @@ def find_suggestions(request):
     print(json.dumps(payload))
     restaurants = places_client.find_suggestion(payload['value'])
     mongo_client.save_restaurants_info(restaurants)
+
     options = list(
         {
             'text': {
                 "type": "plain_text",
-                "text": f"{restaurant['name']} {restaurant['opening_hours']['open_now'] if 'open' else 'close'} {restaurant['rating']}"
+                "text": f"{restaurant['name']} { 'open' if restaurant['opening_hours']['open_now'] else 'close'} {restaurant['rating']}"
             },
             'value': restaurant['place_id']
         } for restaurant in restaurants['results'])
