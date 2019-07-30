@@ -53,7 +53,7 @@ def find_suggestions(request):
         {
             'text': {
                 "type": "plain_text",
-                "text": f"{restaurant['name']} { 'open' if restaurant['opening_hours']['open_now'] else 'close'} {restaurant['rating']}"
+                "text": f"{restaurant['name']} { 'open' if restaurant['opening_hours'].get('open_now') else 'close'} {restaurant['rating']}"
             },
             'value': restaurant['place_id']
         } for restaurant in restaurants['results'])
