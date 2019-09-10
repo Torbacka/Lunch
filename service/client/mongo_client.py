@@ -16,6 +16,13 @@ def get_votes(date_input):
     return collection.find_one({'date': date_input.isoformat()})
 
 
+def get_all_votes():
+    client = pymongo.MongoClient(f"mongodb://root:{password}@hack-for-sweden-shard-00-00-7vayj.mongodb.net:27017,hack-for-sweden-shard-00-01-7vayj.mongodb.net:27017,"
+                                 "hack-for-sweden-shard-00-02-7vayj.mongodb.net:27017/test?ssl=true&replicaSet=hack-for-sweden-shard-0&authSource=admin&retryWrites=true")
+    collection = client['lunch']['votes']
+    return collection.find()
+
+
 def update_vote(place_id, user_id):
     """
     Update the user_id choice, if the user_id already exist in the choice it will be removed.
@@ -115,20 +122,20 @@ def save_restaurants_info(restaurants):
         if restaurant['place_id'] in found_place_ids:
             collection.update_one({'place_id': restaurant['place_id']}
                                   , {'$set': {
-                                        "geometry": restaurant['geometry'],
-                                        "icon": restaurant['icon'],
-                                        "id": restaurant['id'],
-                                        "name": restaurant['name'],
-                                        "opening_hours": restaurant.get('opening_hours'),
-                                        "photos": restaurant['photos'],
-                                        "place_id": restaurant['place_id'],
-                                        "plus_code": restaurant['plus_code'],
-                                        "rating": restaurant['rating'],
-                                        "reference": restaurant['reference'],
-                                        "types": restaurant['types'],
-                                        "user_ratings_total": restaurant['user_ratings_total'],
-                                        "vicinity": restaurant['vicinity']
-                                    }})
+                    "geometry": restaurant['geometry'],
+                    "icon": restaurant['icon'],
+                    "id": restaurant['id'],
+                    "name": restaurant['name'],
+                    "opening_hours": restaurant.get('opening_hours'),
+                    "photos": restaurant['photos'],
+                    "place_id": restaurant['place_id'],
+                    "plus_code": restaurant['plus_code'],
+                    "rating": restaurant['rating'],
+                    "reference": restaurant['reference'],
+                    "types": restaurant['types'],
+                    "user_ratings_total": restaurant['user_ratings_total'],
+                    "vicinity": restaurant['vicinity']
+                }})
         else:
             collection.insert_one(restaurant)
 
