@@ -50,16 +50,6 @@ def clean_all_tables(app):
 
 
 @pytest.fixture
-def clean_all_tables_with_stats(app):
-    """Truncate all tables including workspaces and restaurant_stats."""
-    with app.app_context():
-        pool = app.extensions['pool']
-        with pool.connection() as conn:
-            conn.execute("TRUNCATE votes, poll_options, polls, restaurants, workspaces, restaurant_stats RESTART IDENTITY CASCADE")
-        yield
-
-
-@pytest.fixture
 def workspace_a():
     """Workspace A test data."""
     return {'team_id': 'T_ALPHA', 'team_name': 'Alpha Team'}

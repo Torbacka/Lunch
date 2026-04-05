@@ -16,17 +16,6 @@ class Config:
     # lunchbot_app role URL — subject to RLS. Falls back to DATABASE_URL if not set.
     APP_DB_URL = os.environ.get('APP_DB_URL', DATABASE_URL)
 
-    # Smart recommendations (Phase 4)
-    # D-09: defaults POLL_SIZE=4, SMART_PICKS=2
-    # D-10: overridable via env vars
-    # D-11: single config for all workspaces
-    # T-04-02: input validation — POLL_SIZE >= 1, SMART_PICKS clamped to [0, POLL_SIZE]
-    POLL_SIZE = max(1, int(os.environ.get('POLL_SIZE', '4')))
-    SMART_PICKS = min(
-        max(0, int(os.environ.get('SMART_PICKS', '2'))),
-        max(1, int(os.environ.get('POLL_SIZE', '4')))
-    )
-
 class DevConfig(Config):
     DEBUG = True
     LOG_LEVEL = 'DEBUG'

@@ -77,11 +77,11 @@ Plans:
   2. Remaining poll slots are filled with random restaurant suggestions not recently shown
   3. Admin can configure total poll size and the ratio of smart picks to random picks
   4. Restaurant reputation data (win rate, times shown, vote counts) is tracked and updates after each poll
-**Plans**: 2 plans
+**Plans**: TBD
 
 Plans:
-- [x] 04-01-PLAN.md — Config, schema migration (restaurant_stats + RLS), and db_client stats functions
-- [x] 04-02-PLAN.md — Thompson sampling recommendation service and push_poll integration
+- [ ] 04-01: TBD
+- [ ] 04-02: TBD
 
 ### Phase 5: Poll Automation and Onboarding
 **Goal**: Polls run on autopilot with scheduled triggers and auto-close, and new workspaces get a guided setup experience
@@ -107,5 +107,5 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5
 | 1. Foundation | 0/3 | Planned | - |
 | 2. Multi-Tenancy | 0/0 | Not started | - |
 | 3. Core Bot Migration | 0/3 | Planned | - |
-| 4. Smart Recommendations | 0/2 | Planned | - |
+| 4. Smart Recommendations | 0/0 | Not started | - |
 | 5. Poll Automation and Onboarding | 0/0 | Not started | - |
