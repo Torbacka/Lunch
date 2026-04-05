@@ -87,33 +87,33 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| INFRA-01 | TBD | Pending |
-| INFRA-02 | TBD | Pending |
-| INFRA-03 | TBD | Pending |
-| INFRA-04 | TBD | Pending |
-| MTNT-01 | TBD | Pending |
-| MTNT-02 | TBD | Pending |
-| MTNT-03 | TBD | Pending |
-| MTNT-04 | TBD | Pending |
-| BOT-01 | TBD | Pending |
-| BOT-02 | TBD | Pending |
-| BOT-03 | TBD | Pending |
-| BOT-04 | TBD | Pending |
-| BOT-05 | TBD | Pending |
-| BOT-06 | TBD | Pending |
-| BOT-07 | TBD | Pending |
-| BOT-08 | TBD | Pending |
-| BOT-09 | TBD | Pending |
-| BOT-10 | TBD | Pending |
-| BOT-11 | TBD | Pending |
-| BOT-12 | TBD | Pending |
-| BOT-13 | TBD | Pending |
+| INFRA-01 | Phase 1 | Pending |
+| INFRA-02 | Phase 1 | Pending |
+| INFRA-03 | Phase 1 | Pending |
+| INFRA-04 | Phase 1 | Pending |
+| MTNT-01 | Phase 2 | Pending |
+| MTNT-02 | Phase 2 | Pending |
+| MTNT-03 | Phase 2 | Pending |
+| MTNT-04 | Phase 2 | Pending |
+| BOT-01 | Phase 3 | Pending |
+| BOT-02 | Phase 3 | Pending |
+| BOT-03 | Phase 3 | Pending |
+| BOT-04 | Phase 3 | Pending |
+| BOT-05 | Phase 4 | Pending |
+| BOT-06 | Phase 4 | Pending |
+| BOT-07 | Phase 4 | Pending |
+| BOT-08 | Phase 5 | Pending |
+| BOT-09 | Phase 5 | Pending |
+| BOT-10 | Phase 5 | Pending |
+| BOT-11 | Phase 4 | Pending |
+| BOT-12 | Phase 3 | Pending |
+| BOT-13 | Phase 3 | Pending |
 
 **Coverage:**
 - v1 requirements: 21 total
-- Mapped to phases: 0
-- Unmapped: 21
+- Mapped to phases: 21
+- Unmapped: 0
 
 ---
 *Requirements defined: 2026-04-05*
-*Last updated: 2026-04-05 after initial definition*
+*Last updated: 2026-04-05 after roadmap creation*
