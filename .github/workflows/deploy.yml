@@ -3,30 +3,29 @@ name: Deploy LunchBot
 on:
   push:
     branches: [master]
+    paths:
+      - lunchbot/**
+      - migrations/**
+      - tests/**
+      - Dockerfile
+      - docker-compose.yml
+      - requirements.txt
+      - scripts/deploy.sh
+      - .github/workflows/deploy.yml
+
+  workflow_dispatch:
 
 jobs:
   deploy:
+    name: Deploy to Home Server
     runs-on: self-hosted
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
       - name: Run blue-green deploy
-        env:
-          DATABASE_URL: ${{ secrets.DATABASE_URL }}
-          APP_DB_URL: ${{ secrets.APP_DB_URL }}
-          SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
-          SLACK_SIGNING_SECRET: ${{ secrets.SLACK_SIGNING_SECRET }}
-          GOOGLE_PLACES_API_KEY: ${{ secrets.GOOGLE_PLACES_API_KEY }}
-          SLACK_CLIENT_ID: ${{ secrets.SLACK_CLIENT_ID }}
-          SLACK_CLIENT_SECRET: ${{ secrets.SLACK_CLIENT_SECRET }}
-          FERNET_KEY: ${{ secrets.FERNET_KEY }}
-          SECRET_KEY: ${{ secrets.SECRET_KEY }}
-          POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
-        run: |
-          # Ensure postgres and nginx are running
-          docker compose --profile blue --profile green up -d postgres nginx
-          # Wait for postgres healthy
-          docker compose exec postgres pg_isready -U lunchbot -d lunchbot
-          # Run deploy script
-          bash scripts/deploy.sh
+        run: bash scripts/deploy.sh
+
+      - name: Prune old images
+        run: docker image prune -f

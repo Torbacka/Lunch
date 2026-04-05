@@ -3,6 +3,7 @@ set -euo pipefail
 
 DEPLOY_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 STATE_FILE="/opt/lunchbot/active_color"
+UPSTREAM_CONF="/etc/nginx/conf.d/lunchbot-upstream.conf"
 COMPOSE="docker compose -f ${DEPLOY_DIR}/docker-compose.yml"
 
 # Read current active color (default blue)
@@ -12,38 +13,36 @@ else
     ACTIVE="blue"
 fi
 
-# Determine inactive
+# Determine inactive slot
 if [[ "$ACTIVE" == "blue" ]]; then
     INACTIVE="green"
+    INACTIVE_PORT=5002
 else
     INACTIVE="blue"
+    INACTIVE_PORT=5001
 fi
 
-echo "==> Active: $ACTIVE, deploying to: $INACTIVE"
+echo "==> Active: $ACTIVE, deploying to: $INACTIVE (port $INACTIVE_PORT)"
 
 # Build fresh image
 echo "==> Building image..."
-$COMPOSE build app-${INACTIVE}
+$COMPOSE build
 
-# Tag image for the specific color
-docker tag lunchbot:latest lunchbot:${INACTIVE}
-
-# Start inactive container (profile-based)
-echo "==> Starting $INACTIVE..."
+# Start inactive container
+echo "==> Starting lunchbot-$INACTIVE..."
 $COMPOSE --profile "$INACTIVE" up -d "app-${INACTIVE}"
 
-# Health check: retry 10 times, 3s apart
-echo "==> Health checking $INACTIVE..."
-CONTAINER="lunchbot-${INACTIVE}"
+# Health check against localhost port — retry 10 times, 3s apart
+echo "==> Health checking http://localhost:${INACTIVE_PORT}/health ..."
 for i in $(seq 1 10); do
-    STATUS=$(docker exec "$CONTAINER" curl -sf http://localhost:5000/health 2>/dev/null \
+    STATUS=$(curl -sf "http://localhost:${INACTIVE_PORT}/health" \
         | python3 -c "import sys,json; print(json.load(sys.stdin).get('status',''))" 2>/dev/null || echo "")
     if [[ "$STATUS" == "healthy" ]]; then
-        echo "==> $INACTIVE is healthy!"
+        echo "==> lunchbot-$INACTIVE is healthy!"
         break
     fi
     if [[ $i -eq 10 ]]; then
-        echo "==> $INACTIVE failed health check after 10 attempts, rolling back"
+        echo "==> lunchbot-$INACTIVE failed health check after 10 attempts — rolling back"
         $COMPOSE --profile "$INACTIVE" stop "app-${INACTIVE}"
         exit 1
     fi
@@ -51,13 +50,13 @@ for i in $(seq 1 10); do
     sleep 3
 done
 
-# Switch nginx upstream
-echo "==> Switching nginx to $INACTIVE..."
-cp "${DEPLOY_DIR}/nginx/upstream-${INACTIVE}.conf" "${DEPLOY_DIR}/nginx/active_upstream.conf"
-docker exec lunchbot-nginx nginx -s reload
+# Switch nginx upstream and reload server nginx
+echo "==> Switching nginx upstream to $INACTIVE..."
+sudo cp "${DEPLOY_DIR}/nginx/upstream-${INACTIVE}.conf" "$UPSTREAM_CONF"
+sudo nginx -s reload
 
 # Stop old container
-echo "==> Stopping $ACTIVE..."
+echo "==> Stopping lunchbot-$ACTIVE..."
 $COMPOSE --profile "$ACTIVE" stop "app-${ACTIVE}"
 
 # Persist new active color
