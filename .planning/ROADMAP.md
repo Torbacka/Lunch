@@ -80,8 +80,8 @@ Plans:
 **Plans**: 2 plans
 
 Plans:
-- [ ] 04-01-PLAN.md — Config, schema migration (restaurant_stats + RLS), and db_client stats functions
-- [ ] 04-02-PLAN.md — Thompson sampling recommendation service and push_poll integration
+- [x] 04-01-PLAN.md — Config, schema migration (restaurant_stats + RLS), and db_client stats functions
+- [x] 04-02-PLAN.md — Thompson sampling recommendation service and push_poll integration
 
 ### Phase 5: Poll Automation and Onboarding
 **Goal**: Polls run on autopilot with scheduled triggers and auto-close, and new workspaces get a guided setup experience
