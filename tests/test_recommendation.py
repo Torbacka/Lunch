@@ -4,6 +4,7 @@ Tests for BOT-07 (admin config), BOT-05 (Thompson sampling), BOT-06 (random fill
 """
 import os
 import pytest
+import numpy as np
 
 
 # --- Config tests (BOT-07) ---
@@ -70,21 +71,108 @@ def test_config_smart_picks_clamped_to_poll_size(monkeypatch):
     importlib.reload(cfg_module)
 
 
-# --- Algorithm stub tests (BOT-05, BOT-06, BOT-11) — implemented in Plan 02 ---
+# --- Algorithm tests (BOT-05, BOT-06) ---
 
-@pytest.mark.skip(reason="Plan 02")
 def test_thompson_sampling_selects_top_n():
-    """Thompson sampling selects top N candidates by sampled Beta score."""
-    pass
+    """BOT-05: Thompson sampling picks restaurants with highest sampled scores."""
+    from lunchbot.services.recommendation_service import thompson_sample
+    candidates = [
+        {'restaurant_id': 1, 'alpha': 10.0, 'beta': 1.0},  # strong winner
+        {'restaurant_id': 2, 'alpha': 1.0, 'beta': 10.0},  # weak
+        {'restaurant_id': 3, 'alpha': 5.0, 'beta': 2.0},   # decent
+    ]
+    rng = np.random.default_rng(42)
+    picks = thompson_sample(candidates, n_picks=2, rng=rng)
+    assert len(picks) == 2
+    # With seed 42 and these alpha/beta, restaurant 1 should be picked
+    picked_ids = [p['restaurant_id'] for p in picks]
+    assert 1 in picked_ids  # strong winner always in top 2
 
 
-@pytest.mark.skip(reason="Plan 02")
-def test_random_fill_excludes_today():
-    """Random fill excludes restaurants already in today's poll."""
-    pass
+def test_thompson_sampling_empty_candidates():
+    """Thompson sampling with empty candidates returns empty list."""
+    from lunchbot.services.recommendation_service import thompson_sample
+    assert thompson_sample([], n_picks=2) == []
 
 
-@pytest.mark.skip(reason="Plan 02")
-def test_ensure_poll_options_preserves_manual():
-    """ensure_poll_options preserves manually-added poll options."""
-    pass
+def test_thompson_sampling_fewer_candidates_than_picks():
+    """Thompson sampling with fewer candidates than n_picks returns all candidates."""
+    from lunchbot.services.recommendation_service import thompson_sample
+    candidates = [{'restaurant_id': 1, 'alpha': 1.0, 'beta': 1.0}]
+    picks = thompson_sample(candidates, n_picks=5)
+    assert len(picks) == 1
+
+
+def test_thompson_sampling_returns_exact_n():
+    """Thompson sampling returns exactly n_picks when pool is large enough."""
+    from lunchbot.services.recommendation_service import thompson_sample
+    candidates = [
+        {'restaurant_id': i, 'alpha': 1.0, 'beta': 1.0} for i in range(10)
+    ]
+    picks = thompson_sample(candidates, n_picks=3, rng=np.random.default_rng(0))
+    assert len(picks) == 3
+
+
+def test_random_fill_excludes_ids():
+    """BOT-06: Random fill excludes restaurants already in poll."""
+    from lunchbot.services.recommendation_service import select_random_fill
+    pool = [
+        {'restaurant_id': 1, 'name': 'A'},
+        {'restaurant_id': 2, 'name': 'B'},
+        {'restaurant_id': 3, 'name': 'C'},
+    ]
+    rng = np.random.default_rng(42)
+    fills = select_random_fill(pool, n_fill=2, exclude_ids={1}, rng=rng)
+    assert len(fills) == 2
+    fill_ids = [f['restaurant_id'] for f in fills]
+    assert 1 not in fill_ids
+
+
+def test_random_fill_empty_pool():
+    """Random fill with empty pool returns empty list."""
+    from lunchbot.services.recommendation_service import select_random_fill
+    assert select_random_fill([], n_fill=3) == []
+
+
+def test_random_fill_returns_up_to_n():
+    """Random fill returns at most n_fill candidates."""
+    from lunchbot.services.recommendation_service import select_random_fill
+    pool = [
+        {'restaurant_id': 1, 'name': 'A'},
+        {'restaurant_id': 2, 'name': 'B'},
+    ]
+    rng = np.random.default_rng(0)
+    fills = select_random_fill(pool, n_fill=5, rng=rng)
+    # Only 2 in pool, so at most 2
+    assert len(fills) <= 2
+
+
+def test_random_fill_all_excluded():
+    """Random fill with all candidates excluded returns empty list."""
+    from lunchbot.services.recommendation_service import select_random_fill
+    pool = [{'restaurant_id': 1, 'name': 'A'}]
+    fills = select_random_fill(pool, n_fill=1, exclude_ids={1})
+    assert fills == []
+
+
+# --- Integration test for push_poll calling ensure_poll_options ---
+
+def test_ensure_poll_options_called_from_push_poll(app_context, monkeypatch):
+    """D-04: push_poll triggers ensure_poll_options inline."""
+    from unittest.mock import patch
+    from lunchbot.services import poll_service
+
+    calls = []
+    def mock_ensure(poll_date=None, workspace_id=None):
+        calls.append({'poll_date': poll_date, 'workspace_id': workspace_id})
+        return 0
+
+    with patch('lunchbot.services.poll_service.ensure_poll_options', mock_ensure):
+        with patch.object(poll_service.slack_client, 'post_message', return_value={'ok': True}):
+            with patch.object(poll_service.db_client, 'get_votes', return_value=[]):
+                from datetime import date
+                poll_service.push_poll('#lunch', 'T_TEST')
+
+    assert len(calls) == 1
+    from datetime import date
+    assert calls[0]['poll_date'] == date.today()

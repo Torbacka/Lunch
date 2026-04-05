@@ -10,6 +10,7 @@ from flask import current_app
 
 from lunchbot.client import db_client
 from lunchbot.client import slack_client
+from lunchbot.services.recommendation_service import ensure_poll_options
 
 logger = logging.getLogger(__name__)
 
@@ -103,6 +104,7 @@ def push_poll(channel, team_id):
     Returns:
         Slack API response dict
     """
+    ensure_poll_options(poll_date=date.today())
     options = db_client.get_votes(date.today())
     blocks = build_poll_blocks(options)
     return slack_client.post_message(channel, blocks, team_id)
