@@ -31,6 +31,12 @@ def create_app(config_name='dev'):
     atexit.register(pool.close)
     logger.info('Connection pool initialized')
 
+    # Register middleware (Phase 2: multi-tenancy)
+    from lunchbot.middleware.signature import verify_slack_signature
+    from lunchbot.middleware.tenant import set_tenant_context
+    app.before_request(verify_slack_signature)
+    app.before_request(set_tenant_context)
+
     # Register blueprints (D-10)
     from lunchbot.blueprints.health import bp as health_bp
     from lunchbot.blueprints.slack_actions import bp as slack_bp
