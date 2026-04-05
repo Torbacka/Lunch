@@ -109,10 +109,10 @@ def upsert_suggestion(poll_date, restaurant_id, workspace_id=None):
 
             # Add restaurant as poll option
             cur.execute("""
-                INSERT INTO poll_options (poll_id, restaurant_id, display_order)
-                VALUES (%(poll_id)s, %(restaurant_id)s, %(display_order)s)
+                INSERT INTO poll_options (poll_id, restaurant_id, display_order, workspace_id)
+                VALUES (%(poll_id)s, %(restaurant_id)s, %(display_order)s, %(workspace_id)s)
                 ON CONFLICT (poll_id, restaurant_id) DO NOTHING
-            """, {'poll_id': poll_id, 'restaurant_id': restaurant_id, 'display_order': next_order})
+            """, {'poll_id': poll_id, 'restaurant_id': restaurant_id, 'display_order': next_order, 'workspace_id': workspace_id})
 
             return poll_id
 

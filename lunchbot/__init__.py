@@ -21,7 +21,7 @@ def create_app(config_name='dev'):
 
     # Initialize psycopg3 connection pool (D-05)
     pool = ConnectionPool(
-        conninfo=app.config['DATABASE_URL'],
+        conninfo=app.config['APP_DB_URL'],
         min_size=2,
         max_size=10,
         open=True,

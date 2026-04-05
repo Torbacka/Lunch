@@ -12,6 +12,8 @@ class Config:
     SLACK_CLIENT_ID = os.environ.get('SLACK_CLIENT_ID')
     SLACK_CLIENT_SECRET = os.environ.get('SLACK_CLIENT_SECRET')
     FERNET_KEY = os.environ.get('FERNET_KEY')
+    # lunchbot_app role URL — subject to RLS. Falls back to DATABASE_URL if not set.
+    APP_DB_URL = os.environ.get('APP_DB_URL', DATABASE_URL)
 
 class DevConfig(Config):
     DEBUG = True
@@ -20,6 +22,9 @@ class DevConfig(Config):
 class TestConfig(Config):
     TESTING = True
     DATABASE_URL = os.environ.get('TEST_DATABASE_URL', 'postgresql://localhost/lunchbot_test')
+    # Tests use superuser for pool so fixtures (TRUNCATE, etc.) work.
+    # test_rls.py directly connects as lunchbot_app to verify RLS enforcement.
+    APP_DB_URL = os.environ.get('TEST_DATABASE_URL', 'postgresql://localhost/lunchbot_test')
     LOG_LEVEL = 'DEBUG'
     # Disable Slack signature verification in tests; test_tenant_middleware.py tests
     # the verification logic directly with explicit signing secrets per test.
