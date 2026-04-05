@@ -213,3 +213,138 @@ def update_restaurant_url(place_id, url, website):
         WHERE place_id = %(place_id)s
         RETURNING *
     """, {'url': url, 'website': website, 'place_id': place_id}, fetch='one')
+
+
+def get_or_create_stats(restaurant_id, workspace_id=None):
+    """Get or create restaurant_stats row for a restaurant.
+    Per D-14: returns dict with id, restaurant_id, workspace_id, alpha, beta, times_shown.
+    Creates with defaults alpha=1.0, beta=1.0, times_shown=0 if not exists (D-07).
+    """
+    workspace_id = workspace_id or getattr(g, 'workspace_id', None)
+    with get_pool().connection() as conn:
+        if workspace_id:
+            conn.execute(f"SET app.current_tenant = '{workspace_id}'")
+        with conn.cursor(row_factory=dict_row) as cur:
+            cur.execute("""
+                INSERT INTO restaurant_stats (restaurant_id, workspace_id)
+                VALUES (%(restaurant_id)s, %(workspace_id)s)
+                ON CONFLICT (restaurant_id, workspace_id) DO NOTHING
+            """, {'restaurant_id': restaurant_id, 'workspace_id': workspace_id})
+            cur.execute("""
+                SELECT id, restaurant_id, workspace_id, alpha, beta, times_shown,
+                       created_at, updated_at
+                FROM restaurant_stats
+                WHERE restaurant_id = %(restaurant_id)s
+            """, {'restaurant_id': restaurant_id})
+            return cur.fetchone()
+
+
+def get_candidate_pool(poll_date):
+    """Get all workspace restaurants NOT in today's poll, with their stats.
+    Per D-15: candidate pool is all restaurants not already in today's poll.
+    Returns list of dicts with restaurant_id, name, place_id, alpha, beta, times_shown.
+    Uses LEFT JOIN so restaurants without stats get defaults alpha=1.0, beta=1.0 (D-07).
+    Handles Pitfall 2: COALESCE ensures NULL stats rows get uninformative prior.
+    """
+    return execute_with_tenant("""
+        SELECT r.id AS restaurant_id, r.name, r.place_id,
+               COALESCE(rs.alpha, 1.0) AS alpha,
+               COALESCE(rs.beta, 1.0) AS beta,
+               COALESCE(rs.times_shown, 0) AS times_shown
+        FROM restaurants r
+        LEFT JOIN restaurant_stats rs ON rs.restaurant_id = r.id
+        WHERE r.id NOT IN (
+            SELECT po.restaurant_id
+            FROM poll_options po
+            JOIN polls p ON p.id = po.poll_id
+            WHERE p.poll_date = %(poll_date)s
+        )
+        ORDER BY r.name
+    """, {'poll_date': poll_date})
+
+
+def get_unprocessed_polls(before_date):
+    """Get polls that haven't had their stats computed yet.
+    Per D-08 + RESEARCH open question #1: finds polls where stats_processed_at IS NULL
+    and poll_date < before_date. Handles gaps (multiple unprocessed days).
+    Returns list of dicts with id, poll_date, workspace_id.
+    """
+    return execute_with_tenant("""
+        SELECT id, poll_date, workspace_id
+        FROM polls
+        WHERE stats_processed_at IS NULL
+          AND poll_date < %(before_date)s
+        ORDER BY poll_date ASC
+    """, {'before_date': before_date})
+
+
+def get_poll_vote_shares(poll_id):
+    """Compute vote share per restaurant for a completed poll.
+    Per D-06: returns list of dicts with restaurant_id, votes_received, total_unique_voters.
+    If total_unique_voters is 0 (nobody voted), returns empty list (skip stats update per Pitfall 1).
+    """
+    rows = execute_with_tenant("""
+        WITH poll_votes AS (
+            SELECT po.restaurant_id,
+                   COUNT(DISTINCT v.user_id) AS votes_received
+            FROM poll_options po
+            LEFT JOIN votes v ON v.poll_option_id = po.id
+            WHERE po.poll_id = %(poll_id)s
+            GROUP BY po.restaurant_id
+        ),
+        total_voters AS (
+            SELECT COUNT(DISTINCT v.user_id) AS total
+            FROM votes v
+            JOIN poll_options po ON po.id = v.poll_option_id
+            WHERE po.poll_id = %(poll_id)s
+        )
+        SELECT pv.restaurant_id,
+               pv.votes_received,
+               tv.total AS total_unique_voters
+        FROM poll_votes pv
+        CROSS JOIN total_voters tv
+    """, {'poll_id': poll_id})
+    # Pitfall 1: skip if nobody voted (avoid noisy zero-vote stats updates)
+    if rows and rows[0]['total_unique_voters'] == 0:
+        return []
+    return rows
+
+
+def update_restaurant_stats(restaurant_id, alpha_increment, beta_increment, workspace_id=None):
+    """Upsert restaurant stats with increments from a completed poll.
+    Per D-06: alpha += votes_received, beta += (total_voters - votes_received).
+    Per D-12: uses ON CONFLICT upsert pattern. Also increments times_shown.
+    """
+    workspace_id = workspace_id or getattr(g, 'workspace_id', None)
+    with get_pool().connection() as conn:
+        if workspace_id:
+            conn.execute(f"SET app.current_tenant = '{workspace_id}'")
+        with conn.cursor(row_factory=dict_row) as cur:
+            cur.execute("""
+                INSERT INTO restaurant_stats (restaurant_id, workspace_id, alpha, beta, times_shown)
+                VALUES (%(restaurant_id)s, %(workspace_id)s,
+                        1.0 + %(alpha_increment)s, 1.0 + %(beta_increment)s, 1)
+                ON CONFLICT (restaurant_id, workspace_id) DO UPDATE SET
+                    alpha = restaurant_stats.alpha + %(alpha_increment)s,
+                    beta = restaurant_stats.beta + %(beta_increment)s,
+                    times_shown = restaurant_stats.times_shown + 1,
+                    updated_at = NOW()
+                RETURNING *
+            """, {
+                'restaurant_id': restaurant_id,
+                'workspace_id': workspace_id,
+                'alpha_increment': alpha_increment,
+                'beta_increment': beta_increment,
+            })
+            return cur.fetchone()
+
+
+def mark_poll_stats_processed(poll_id):
+    """Mark a poll as having its stats computed. Prevents double-processing.
+    Per RESEARCH assumption A3: sets stats_processed_at timestamp.
+    """
+    return execute_with_tenant("""
+        UPDATE polls SET stats_processed_at = NOW()
+        WHERE id = %(poll_id)s
+        RETURNING id, stats_processed_at
+    """, {'poll_id': poll_id}, fetch='one')
