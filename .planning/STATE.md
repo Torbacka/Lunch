@@ -28,7 +28,7 @@ See: .planning/PROJECT.md (updated 2026-04-05)
 Phase: 03 (core-bot-migration) — COMPLETE ✓
 Plan: 3 of 3
 Status: Phase 03 complete — 85 tests passing, all 6 requirements delivered
-Last activity: 2026-04-05 -- Phase 03 complete (85 tests passing)
+Last activity: 2026-04-05 -- Completed quick task 260405-vqq: Set up blue-green Docker deployment infrastructure
 
 Progress: ████████░░ 82% (phases 01-03 complete)
 
@@ -72,6 +72,12 @@ None yet.
 
 - MongoDB document inconsistency (field naming bugs) may complicate migration scripts -- audit actual document shapes before writing migration
 - Home server capacity for PostgreSQL + Flask + Nginx unverified
+
+### Quick Tasks Completed
+
+| # | Description | Date | Commit | Directory |
+|---|-------------|------|--------|-----------|
+| 260405-vqq | Set up blue-green Docker deployment infrastructure for LunchBot on home Ubuntu server | 2026-04-05 | da5f583 | [260405-vqq-set-up-blue-green-docker-deployment-infr](./quick/260405-vqq-set-up-blue-green-docker-deployment-infr/) |
 
 ## Session Continuity
 
