@@ -32,9 +32,9 @@ Decimal phases appear between their surrounding integers in numeric order.
 **Plans**: 3 plans
 
 Plans:
-- [ ] 01-01-PLAN.md — Dependencies, config system, Alembic setup, and initial PostgreSQL schema migration
-- [ ] 01-02-PLAN.md — Flask app factory with psycopg3 pool, health endpoint, and db_client query functions
-- [ ] 01-03-PLAN.md — Remaining blueprints, app factory wiring, and comprehensive test suite
+- [x] 01-01-PLAN.md — Dependencies, config system, Alembic setup, and initial PostgreSQL schema migration
+- [x] 01-02-PLAN.md — Flask app factory with psycopg3 pool, health endpoint, and db_client query functions
+- [x] 01-03-PLAN.md — Remaining blueprints, app factory wiring, and comprehensive test suite
 
 ### Phase 2: Multi-Tenancy
 **Goal**: Multiple Slack workspaces can install LunchBot independently with full data isolation between them
