@@ -9,6 +9,9 @@ class Config:
     SLACK_BOT_TOKEN = os.environ.get('SLACK_BOT_TOKEN')
     SLACK_SIGNING_SECRET = os.environ.get('SLACK_SIGNING_SECRET')
     GOOGLE_PLACES_API_KEY = os.environ.get('GOOGLE_PLACES_API_KEY')
+    SLACK_CLIENT_ID = os.environ.get('SLACK_CLIENT_ID')
+    SLACK_CLIENT_SECRET = os.environ.get('SLACK_CLIENT_SECRET')
+    FERNET_KEY = os.environ.get('FERNET_KEY')
 
 class DevConfig(Config):
     DEBUG = True

@@ -45,12 +45,11 @@ Plans:
   2. Workspace A cannot see or access Workspace B's restaurants, votes, or settings (enforced by PostgreSQL RLS)
   3. Every incoming Slack request automatically resolves to the correct workspace context without manual configuration
   4. Uninstalling LunchBot from a workspace cleans up tokens and soft-deletes that workspace's data
-**Plans**: 3 plans
+**Plans**: TBD
 
 Plans:
-- [ ] 02-01-PLAN.md — Workspaces table, RLS policies, workspace_id denormalization, workspace_client
-- [ ] 02-02-PLAN.md — Tenant context middleware, signature verification, tenant-scoped db helper
-- [ ] 02-03-PLAN.md — OAuth V2 install/callback with Fernet encryption, events endpoint for uninstall
+- [ ] 02-01: TBD
+- [ ] 02-02: TBD
 
 ### Phase 3: Core Bot Migration
 **Goal**: All existing bot features work on the new multi-tenant stack -- users can trigger polls, vote, search restaurants, and tag with emoji
@@ -105,8 +104,8 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Foundation | 3/3 | Complete | - |
-| 2. Multi-Tenancy | 0/3 | Planning | - |
+| 1. Foundation | 0/3 | Planned | - |
+| 2. Multi-Tenancy | 0/0 | Not started | - |
 | 3. Core Bot Migration | 0/0 | Not started | - |
 | 4. Smart Recommendations | 0/0 | Not started | - |
 | 5. Poll Automation and Onboarding | 0/0 | Not started | - |
