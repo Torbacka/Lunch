@@ -61,12 +61,12 @@ Plans:
   3. Restaurant suggestions are sourced from Google Places API and results are cached to reduce API calls
   4. Users can tag restaurants with emoji and those tags persist across polls
   5. Slash command with no arguments or "help" returns a helpful ephemeral response listing available commands
-**Plans**: TBD
+**Plans**: 3 plans
 
 Plans:
-- [ ] 03-01: TBD
-- [ ] 03-02: TBD
-- [ ] 03-03: TBD
+- [ ] 03-01-PLAN.md — Per-workspace Slack API client and poll builder service (Wave 1 foundation)
+- [ ] 03-02-PLAN.md — Slash command handler, poll trigger, voting service (Wave 2)
+- [ ] 03-03-PLAN.md — Places API client, restaurant search, emoji tagging service (Wave 2)
 
 ### Phase 4: Smart Recommendations
 **Goal**: Polls include smart restaurant picks that learn from team voting history, balanced with random exploration
@@ -106,6 +106,6 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5
 |-------|----------------|--------|-----------|
 | 1. Foundation | 0/3 | Planned | - |
 | 2. Multi-Tenancy | 0/0 | Not started | - |
-| 3. Core Bot Migration | 0/0 | Not started | - |
+| 3. Core Bot Migration | 0/3 | Planned | - |
 | 4. Smart Recommendations | 0/0 | Not started | - |
 | 5. Poll Automation and Onboarding | 0/0 | Not started | - |
