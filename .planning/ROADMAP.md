@@ -64,9 +64,9 @@ Plans:
 **Plans**: 3 plans
 
 Plans:
-- [ ] 03-01-PLAN.md — Per-workspace Slack API client and poll builder service (Wave 1 foundation)
-- [ ] 03-02-PLAN.md — Slash command handler, poll trigger, voting service (Wave 2)
-- [ ] 03-03-PLAN.md — Places API client, restaurant search, emoji tagging service (Wave 2)
+- [x] 03-01-PLAN.md — Per-workspace Slack API client and poll builder service (Wave 1 foundation)
+- [x] 03-02-PLAN.md — Slash command handler, poll trigger, voting service (Wave 2)
+- [x] 03-03-PLAN.md — Places API client, restaurant search, emoji tagging service (Wave 2)
 
 ### Phase 4: Smart Recommendations
 **Goal**: Polls include smart restaurant picks that learn from team voting history, balanced with random exploration
