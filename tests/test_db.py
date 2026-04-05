@@ -52,7 +52,7 @@ def test_vote_toggle(app_context, clean_tables, sample_restaurant):
 
     restaurant_id = save_restaurant(sample_restaurant)
     today = date.today()
-    upsert_suggestion(today, restaurant_id)
+    upsert_suggestion(today, restaurant_id, workspace_id='T_TEST')
 
     votes = get_votes(today)
     assert len(votes) == 1
@@ -92,7 +92,7 @@ def test_unique_vote_constraint(app_context, clean_tables, sample_restaurant):
 
     restaurant_id = save_restaurant(sample_restaurant)
     today = date.today()
-    upsert_suggestion(today, restaurant_id)
+    upsert_suggestion(today, restaurant_id, workspace_id='T_TEST')
 
     votes = get_votes(today)
     poll_option_id = votes[0]['id']

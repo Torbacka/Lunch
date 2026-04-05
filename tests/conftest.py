@@ -1,3 +1,4 @@
+import contextlib
 import os
 import pytest
 from lunchbot.config import config as app_config
@@ -36,6 +37,43 @@ def clean_tables(app):
         with pool.connection() as conn:
             conn.execute("TRUNCATE votes, poll_options, polls, restaurants RESTART IDENTITY CASCADE")
         yield
+
+
+@pytest.fixture
+def clean_all_tables(app):
+    """Truncate all tables including workspaces."""
+    with app.app_context():
+        pool = app.extensions['pool']
+        with pool.connection() as conn:
+            conn.execute("TRUNCATE votes, poll_options, polls, restaurants, workspaces RESTART IDENTITY CASCADE")
+        yield
+
+
+@pytest.fixture
+def workspace_a():
+    """Workspace A test data."""
+    return {'team_id': 'T_ALPHA', 'team_name': 'Alpha Team'}
+
+
+@pytest.fixture
+def workspace_b():
+    """Workspace B test data."""
+    return {'team_id': 'T_BRAVO', 'team_name': 'Bravo Team'}
+
+
+@pytest.fixture
+def tenant_connection(app):
+    """Factory fixture: returns context manager for tenant-scoped DB connection."""
+    @contextlib.contextmanager
+    def _connect(workspace_id):
+        with app.app_context():
+            pool = app.extensions['pool']
+            with pool.connection() as conn:
+                # SET does not support parameterized values in PostgreSQL;
+                # workspace_id is always an internal fixture value, not user input
+                conn.execute(f"SET app.current_tenant = '{workspace_id}'")
+                yield conn
+    return _connect
 
 
 @pytest.fixture

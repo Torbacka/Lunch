@@ -41,6 +41,21 @@ def upgrade():
     op.execute("ALTER TABLE polls ALTER COLUMN workspace_id SET DEFAULT ''")
     op.execute("ALTER TABLE polls ALTER COLUMN workspace_id SET NOT NULL")
 
+    # Create application role for non-superuser connections (RLS enforcement)
+    # FORCE ROW LEVEL SECURITY is set but superusers still bypass it.
+    # lunchbot_app is a non-superuser role used by the app and RLS tests.
+    op.execute("""
+        DO $$
+        BEGIN
+            IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'lunchbot_app') THEN
+                CREATE ROLE lunchbot_app LOGIN PASSWORD 'lunchbot_app_dev';
+            END IF;
+        END
+        $$
+    """)
+    op.execute("GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO lunchbot_app")
+    op.execute("GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO lunchbot_app")
+
     # Enable RLS and create tenant isolation policies on all four tenant tables
     for table in ['restaurants', 'polls', 'poll_options', 'votes']:
         op.execute(f"ALTER TABLE {table} ENABLE ROW LEVEL SECURITY")
@@ -58,6 +73,21 @@ def downgrade():
     for table in ['restaurants', 'polls', 'poll_options', 'votes']:
         op.execute(f"DROP POLICY IF EXISTS tenant_isolation ON {table}")
         op.execute(f"ALTER TABLE {table} DISABLE ROW LEVEL SECURITY")
+
+    # Revoke permissions from application role in this database.
+    # Note: DROP ROLE is intentionally omitted -- roles are cluster-level
+    # and may be in use by other databases. Upgrade is idempotent (IF NOT EXISTS).
+    op.execute("""
+        DO $$
+        BEGIN
+            IF EXISTS (SELECT FROM pg_roles WHERE rolname = 'lunchbot_app') THEN
+                REVOKE ALL ON ALL TABLES IN SCHEMA public FROM lunchbot_app;
+                REVOKE ALL ON ALL SEQUENCES IN SCHEMA public FROM lunchbot_app;
+                DROP OWNED BY lunchbot_app;
+            END IF;
+        END
+        $$
+    """)
 
     # Make workspace_id nullable again on restaurants and polls
     op.execute("ALTER TABLE restaurants ALTER COLUMN workspace_id DROP NOT NULL")
