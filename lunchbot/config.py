@@ -12,6 +12,7 @@ class Config:
     SLACK_CLIENT_ID = os.environ.get('SLACK_CLIENT_ID')
     SLACK_CLIENT_SECRET = os.environ.get('SLACK_CLIENT_SECRET')
     FERNET_KEY = os.environ.get('FERNET_KEY')
+    SLACK_POLL_CHANNEL = os.environ.get('SLACK_POLL_CHANNEL', '')
     # lunchbot_app role URL — subject to RLS. Falls back to DATABASE_URL if not set.
     APP_DB_URL = os.environ.get('APP_DB_URL', DATABASE_URL)
 
