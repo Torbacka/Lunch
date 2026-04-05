@@ -7,7 +7,7 @@ import logging
 
 from flask import Blueprint, jsonify, request, current_app
 
-from lunchbot.services import poll_service
+from lunchbot.services import poll_service, emoji_service
 
 logger = logging.getLogger(__name__)
 
@@ -78,5 +78,5 @@ def emoji():
     Phase 3 wires to emoji.search_and_update_emoji().
     """
     logger.info('Emoji update triggered')
-    # Phase 3 wires to emoji.search_and_update_emoji()
+    emoji_service.search_and_update_emoji()
     return '', 200
