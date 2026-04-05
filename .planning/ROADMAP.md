@@ -29,11 +29,12 @@ Decimal phases appear between their surrounding integers in numeric order.
   2. All dependencies are current stable versions with no deprecation warnings at startup
   3. PostgreSQL database is running with a normalized schema replacing all MongoDB collections
   4. Database schema changes are applied via Alembic migrations (up and down both work)
-**Plans**: TBD
+**Plans**: 3 plans
 
 Plans:
-- [ ] 01-01: TBD
-- [ ] 01-02: TBD
+- [ ] 01-01-PLAN.md — Dependencies, config system, Alembic setup, and initial PostgreSQL schema migration
+- [ ] 01-02-PLAN.md — Flask app factory with psycopg3 pool, health endpoint, and db_client query functions
+- [ ] 01-03-PLAN.md — Remaining blueprints, app factory wiring, and comprehensive test suite
 
 ### Phase 2: Multi-Tenancy
 **Goal**: Multiple Slack workspaces can install LunchBot independently with full data isolation between them
@@ -103,7 +104,7 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Foundation | 0/0 | Not started | - |
+| 1. Foundation | 0/3 | Planned | - |
 | 2. Multi-Tenancy | 0/0 | Not started | - |
 | 3. Core Bot Migration | 0/0 | Not started | - |
 | 4. Smart Recommendations | 0/0 | Not started | - |
