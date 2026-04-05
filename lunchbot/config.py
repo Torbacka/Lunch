@@ -21,6 +21,9 @@ class TestConfig(Config):
     TESTING = True
     DATABASE_URL = os.environ.get('TEST_DATABASE_URL', 'postgresql://localhost/lunchbot_test')
     LOG_LEVEL = 'DEBUG'
+    # Disable Slack signature verification in tests; test_tenant_middleware.py tests
+    # the verification logic directly with explicit signing secrets per test.
+    SLACK_SIGNING_SECRET = None
 
 class ProdConfig(Config):
     DEBUG = False
