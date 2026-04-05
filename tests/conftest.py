@@ -2,10 +2,55 @@ import os
 import pytest
 from lunchbot.config import config as app_config
 
-@pytest.fixture(scope='session')
-def test_database_url():
-    return app_config['test'].DATABASE_URL
+# Ensure test config is used
+os.environ.setdefault('DATABASE_URL', app_config['test'].DATABASE_URL)
+
 
 @pytest.fixture(scope='session')
-def alembic_ini_path():
-    return os.path.join(os.path.dirname(__file__), '..', 'migrations', 'alembic.ini')
+def app():
+    """Create Flask app with test config. Requires running PostgreSQL."""
+    from lunchbot import create_app
+    app = create_app('test')
+    yield app
+    # Pool closed via atexit
+
+
+@pytest.fixture
+def client(app):
+    """Flask test client."""
+    return app.test_client()
+
+
+@pytest.fixture
+def app_context(app):
+    """Push app context for db_client calls."""
+    with app.app_context():
+        yield
+
+
+@pytest.fixture
+def clean_tables(app):
+    """Truncate all tables before each test. Requires app context."""
+    with app.app_context():
+        pool = app.extensions['pool']
+        with pool.connection() as conn:
+            conn.execute("TRUNCATE votes, poll_options, polls, restaurants RESTART IDENTITY CASCADE")
+        yield
+
+
+@pytest.fixture
+def sample_restaurant():
+    """Sample restaurant dict matching Google Places API response shape."""
+    return {
+        'place_id': 'ChIJtest123',
+        'name': 'Test Restaurant',
+        'rating': 4.5,
+        'price_level': 2,
+        'geometry': {'location': {'lat': 59.3293, 'lng': 18.0686}},
+        'photos': [{'photo_reference': 'abc123'}],
+        'opening_hours': {'open_now': True},
+        'icon': 'https://maps.google.com/icon.png',
+        'vicinity': 'Test Street 1, Stockholm',
+        'types': ['restaurant', 'food'],
+        'user_ratings_total': 150,
+    }
