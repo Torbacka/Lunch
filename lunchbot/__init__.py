@@ -32,6 +32,10 @@ def create_app(config_name='dev'):
 
     # Register blueprints (D-10)
     from lunchbot.blueprints.health import bp as health_bp
+    from lunchbot.blueprints.slack_actions import bp as slack_bp
+    from lunchbot.blueprints.polls import bp as polls_bp
     app.register_blueprint(health_bp)
+    app.register_blueprint(slack_bp)
+    app.register_blueprint(polls_bp)
 
     return app
