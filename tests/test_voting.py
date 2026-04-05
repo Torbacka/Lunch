@@ -155,8 +155,10 @@ class TestActionEndpoint:
     """Tests for POST /action wiring to vote_service."""
 
     @patch('lunchbot.blueprints.slack_actions.vote_service')
-    def test_action_routes_to_vote(self, mock_vote_service, client):
+    def test_action_routes_to_vote(self, mock_vote_service, app, client):
         """POST /action with button payload calls vote_service.vote."""
+        # Ensure signature verification is disabled (can be mutated by other tests)
+        app.config['SLACK_SIGNING_SECRET'] = None
         response = client.post('/action', data={
             'payload': json.dumps(SAMPLE_PAYLOAD)
         })
@@ -167,8 +169,9 @@ class TestActionEndpoint:
         assert call_payload['actions'][0]['value'] == '42'
 
     @patch('lunchbot.blueprints.slack_actions.vote_service')
-    def test_action_non_button_skips_vote(self, mock_vote_service, client):
+    def test_action_non_button_skips_vote(self, mock_vote_service, app, client):
         """POST /action with non-button action does not call vote_service."""
+        app.config['SLACK_SIGNING_SECRET'] = None
         payload = dict(SAMPLE_PAYLOAD)
         payload['actions'] = [{'type': 'external_select', 'value': 'search'}]
         response = client.post('/action', data={
