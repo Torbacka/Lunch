@@ -25,6 +25,7 @@ def create_app(config_name='dev'):
         min_size=2,
         max_size=10,
         open=True,
+        timeout=5,
     )
     app.extensions['pool'] = pool
     atexit.register(pool.close)

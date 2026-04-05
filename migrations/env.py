@@ -1,7 +1,10 @@
 import os
 from logging.config import fileConfig
+from dotenv import load_dotenv
 from alembic import context
 from sqlalchemy import engine_from_config, pool
+
+load_dotenv()
 
 config = context.config
 
@@ -11,6 +14,9 @@ if config.config_file_name is not None:
 # Override sqlalchemy.url from environment variable
 database_url = os.environ.get('DATABASE_URL')
 if database_url:
+    # Ensure psycopg3 driver is used (not psycopg2)
+    if database_url.startswith('postgresql://'):
+        database_url = database_url.replace('postgresql://', 'postgresql+psycopg://', 1)
     config.set_main_option('sqlalchemy.url', database_url)
 
 def run_migrations_online():
