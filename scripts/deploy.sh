@@ -68,6 +68,16 @@ for i in $(seq 1 10); do
     sleep 3
 done
 
+# Ensure site config is installed (idempotent)
+SITE_CONF="/etc/nginx/sites-available/lunch.torbacka.se"
+if [[ ! -f "$SITE_CONF" ]]; then
+    echo "==> Installing nginx site config..."
+    sudo cp "${DEPLOY_DIR}/nginx/lunch.torbacka.se.conf" "$SITE_CONF"
+    sudo ln -sf "$SITE_CONF" /etc/nginx/sites-enabled/lunch.torbacka.se
+else
+    sudo cp "${DEPLOY_DIR}/nginx/lunch.torbacka.se.conf" "$SITE_CONF"
+fi
+
 # Switch nginx upstream and reload server nginx
 echo "==> Switching nginx upstream to $INACTIVE..."
 sudo cp "${DEPLOY_DIR}/nginx/upstream-${INACTIVE}.conf" "$UPSTREAM_CONF"
