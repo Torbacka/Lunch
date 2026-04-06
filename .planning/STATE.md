@@ -28,7 +28,7 @@ See: .planning/PROJECT.md (updated 2026-04-05)
 Phase: 03 (core-bot-migration) — COMPLETE ✓
 Plan: 3 of 3
 Status: Phase 03 complete — 85 tests passing, all 6 requirements delivered
-Last activity: 2026-04-05 -- Completed quick task 260405-vqq: Set up blue-green Docker deployment infrastructure
+Last activity: 2026-04-06 -- Completed quick task 260406-abs: Fix deployment readiness: wsgi.py, Dockerfile CMD, migration step in deploy.sh
 
 Progress: ████████░░ 82% (phases 01-03 complete)
 
@@ -78,6 +78,7 @@ None yet.
 | # | Description | Date | Commit | Directory |
 |---|-------------|------|--------|-----------|
 | 260405-vqq | Set up blue-green Docker deployment infrastructure for LunchBot on home Ubuntu server | 2026-04-05 | da5f583 | [260405-vqq-set-up-blue-green-docker-deployment-infr](./quick/260405-vqq-set-up-blue-green-docker-deployment-infr/) |
+| 260406-abs | Fix deployment readiness: wsgi.py, Dockerfile CMD, migration step in deploy.sh | 2026-04-06 | 2962913 | [260406-abs-fix-deployment-readiness-wsgi-py-dockerf](./quick/260406-abs-fix-deployment-readiness-wsgi-py-dockerf/) |
 
 ## Session Continuity
 
