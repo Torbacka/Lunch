@@ -104,7 +104,10 @@ class TestBuildPollBlocks:
             blocks = build_poll_blocks(SAMPLE_OPTIONS)
             url_ctx = blocks[4]
             assert url_ctx['type'] == 'context'
-            assert 'maps.google.com/pasta' in url_ctx['elements'][0]['text']
+            assert url_ctx['elements'][0]['type'] == 'mrkdwn'
+            # URL context now renders as markdown link: <url|More info>
+            # Should prefer website over url
+            assert '<https://pastapalace.com|More info>' in url_ctx['elements'][0]['text']
 
     def test_divider_after_each_option(self, app):
         with app.app_context():

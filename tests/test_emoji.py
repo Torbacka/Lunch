@@ -93,12 +93,14 @@ class TestSeedEndpoint:
     """Tests for GET /seed endpoint."""
 
     @patch('lunchbot.blueprints.polls.emoji_service')
-    def test_seed_endpoint_returns_200(self, mock_emoji, app, client):
+    @patch('lunchbot.client.workspace_client.get_workspace')
+    def test_seed_endpoint_returns_200(self, mock_get_ws, mock_emoji, app, client):
         """GET /seed calls search_and_update_emoji and returns 200."""
         app.config['SLACK_SIGNING_SECRET'] = None
+        mock_get_ws.return_value = {'location': '59.3419,18.0645'}
         mock_emoji.search_and_update_emoji.return_value = None
 
-        response = client.get('/seed')
+        response = client.get('/seed?team_id=T_TEST')
 
         assert response.status_code == 200
-        mock_emoji.search_and_update_emoji.assert_called_once()
+        mock_emoji.search_and_update_emoji.assert_called_once_with('59.3419,18.0645')

@@ -53,11 +53,13 @@ class TestPlacesClient:
 class TestFindSuggestionsEndpoint:
     """Tests for POST /find_suggestions."""
 
+    @patch('lunchbot.blueprints.slack_actions.get_workspace')
     @patch('lunchbot.blueprints.slack_actions.db_client')
     @patch('lunchbot.blueprints.slack_actions.places_client')
-    def test_find_suggestions_returns_options(self, mock_places, mock_db, app, client):
+    def test_find_suggestions_returns_options(self, mock_places, mock_db, mock_get_ws, app, client):
         """POST /find_suggestions returns formatted Slack options."""
         app.config['SLACK_SIGNING_SECRET'] = None
+        mock_get_ws.return_value = {'location': '59.3419,18.0645'}
         mock_places.find_suggestion.return_value = {
             'results': [
                 {
@@ -83,11 +85,13 @@ class TestFindSuggestionsEndpoint:
         assert 'open' in option['text']['text']
         assert '4.2' in option['text']['text']
 
+    @patch('lunchbot.blueprints.slack_actions.get_workspace')
     @patch('lunchbot.blueprints.slack_actions.db_client')
     @patch('lunchbot.blueprints.slack_actions.places_client')
-    def test_find_suggestions_closed_restaurant(self, mock_places, mock_db, app, client):
+    def test_find_suggestions_closed_restaurant(self, mock_places, mock_db, mock_get_ws, app, client):
         """Closed restaurant shows 'closed' in option text."""
         app.config['SLACK_SIGNING_SECRET'] = None
+        mock_get_ws.return_value = {'location': '59.3419,18.0645'}
         mock_places.find_suggestion.return_value = {
             'results': [
                 {

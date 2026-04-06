@@ -125,16 +125,20 @@ class TestGetUserProfile:
         mock_response.status_code = 200
         mock_response.json.return_value = {
             'ok': True,
-            'profile': {'display_name': 'testuser', 'image_48': 'https://example.com/avatar.png'}
+            'user': {
+                'profile': {'display_name': 'testuser', 'image_48': 'https://example.com/avatar.png'}
+            }
         }
 
         with app.app_context():
             with patch('lunchbot.client.slack_client.get_workspace', return_value=mock_workspace_active), \
                  patch('lunchbot.client.slack_client.session') as mock_session:
-                mock_session.post.return_value = mock_response
+                mock_session.get.return_value = mock_response
                 from lunchbot.client.slack_client import get_user_profile
                 profile = get_user_profile('U_USER', 'T_TEST')
 
-                call_args = mock_session.post.call_args
-                assert 'users.profile.get' in call_args[0][0]
+                call_args = mock_session.get.call_args
+                assert 'users.info' in call_args[0][0]
+                params = call_args[1]['params']
+                assert params['user'] == 'U_USER'
                 assert profile == {'display_name': 'testuser', 'image_48': 'https://example.com/avatar.png'}

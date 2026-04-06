@@ -30,7 +30,7 @@ def test_install_redirects_to_slack(client, app):
 # ---------------------------------------------------------------------------
 
 def test_oauth_redirect_success(client, app):
-    """GET /slack/oauth_redirect with valid code returns 200 and success page."""
+    """GET /slack/oauth_redirect with valid code redirects to setup page."""
     fernet_key = Fernet.generate_key().decode()
     app.config['SLACK_CLIENT_ID'] = 'test-client-id'
     app.config['SLACK_CLIENT_SECRET'] = 'test-client-secret'
@@ -51,8 +51,8 @@ def test_oauth_redirect_success(client, app):
         with patch('lunchbot.blueprints.oauth.save_workspace'):
             response = client.get('/slack/oauth_redirect?code=test-code')
 
-    assert response.status_code == 200
-    assert b'LunchBot Installed' in response.data
+    assert response.status_code == 302
+    assert '/slack/setup?team_id=T_TEST' in response.headers.get('Location', '')
 
 
 # ---------------------------------------------------------------------------
@@ -81,7 +81,7 @@ def test_oauth_redirect_stores_encrypted_token(client, app, clean_all_tables):
 
         response = client.get('/slack/oauth_redirect?code=test-code')
 
-    assert response.status_code == 200
+    assert response.status_code == 302
 
     with app.app_context():
         from lunchbot.client.workspace_client import get_workspace
@@ -99,7 +99,7 @@ def test_oauth_redirect_stores_encrypted_token(client, app, clean_all_tables):
 # ---------------------------------------------------------------------------
 
 def test_oauth_redirect_success_page_contains_heading(client, app):
-    """Success page contains 'LunchBot Installed' heading."""
+    """Successful OAuth redirects to setup page with correct team_id."""
     fernet_key = Fernet.generate_key().decode()
     app.config['SLACK_CLIENT_ID'] = 'test-client-id'
     app.config['SLACK_CLIENT_SECRET'] = 'test-client-secret'
@@ -120,8 +120,8 @@ def test_oauth_redirect_success_page_contains_heading(client, app):
         with patch('lunchbot.blueprints.oauth.save_workspace'):
             response = client.get('/slack/oauth_redirect?code=test-code')
 
-    assert b'LunchBot Installed' in response.data
-    assert b'Return to Slack' in response.data
+    assert response.status_code == 302
+    assert '/slack/setup?team_id=T_HDG' in response.headers.get('Location', '')
 
 
 # ---------------------------------------------------------------------------
@@ -187,7 +187,7 @@ def test_reinstall_reactivates(client, app, clean_all_tables):
         mock_client_class.return_value = mock_client
         response = client.get('/slack/oauth_redirect?code=test-code')
 
-    assert response.status_code == 200
+    assert response.status_code == 302
 
     # Deactivate (simulate uninstall)
     with app.app_context():
@@ -203,7 +203,7 @@ def test_reinstall_reactivates(client, app, clean_all_tables):
         mock_client_class.return_value = mock_client
         response = client.get('/slack/oauth_redirect?code=test-code-2')
 
-    assert response.status_code == 200
+    assert response.status_code == 302
 
     with app.app_context():
         from lunchbot.client.workspace_client import get_workspace

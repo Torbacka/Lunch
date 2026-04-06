@@ -18,16 +18,16 @@ def _insert_workspace(conn, team_id='T_TEST', team_name='Test Team'):
     return team_id
 
 
-def _insert_restaurant(conn, workspace_id, place_id='place_1', name='Test Restaurant'):
+def _insert_restaurant(conn, workspace_id, place_id='place_1', name='Test Restaurant', rating=4.0):
     """Insert a restaurant and return its id."""
     from psycopg.rows import dict_row
     with conn.cursor(row_factory=dict_row) as cur:
         cur.execute(
-            """INSERT INTO restaurants (place_id, name, workspace_id)
-               VALUES (%s, %s, %s)
-               ON CONFLICT (place_id) DO UPDATE SET name = EXCLUDED.name
+            """INSERT INTO restaurants (place_id, name, workspace_id, rating)
+               VALUES (%s, %s, %s, %s)
+               ON CONFLICT (place_id) DO UPDATE SET name = EXCLUDED.name, rating = EXCLUDED.rating
                RETURNING id""",
-            (place_id, name, workspace_id)
+            (place_id, name, workspace_id, rating)
         )
         return cur.fetchone()['id']
 

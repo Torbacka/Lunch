@@ -6,6 +6,7 @@ to directly verify RLS behavior without going through application helpers.
 RLS isolation tests use the lunchbot_app role (non-superuser) because PostgreSQL
 superusers bypass RLS even with FORCE ROW LEVEL SECURITY.
 """
+import os
 import pytest
 import psycopg
 from psycopg.rows import dict_row
@@ -13,11 +14,28 @@ from psycopg.rows import dict_row
 pytestmark = pytest.mark.db
 
 # Superuser URL for setup/teardown (bypasses RLS -- needed for TRUNCATE)
-TEST_DB_URL = "postgresql://postgres:dev@localhost:5432/lunchbot_test"
+TEST_DB_URL = os.environ.get('TEST_DATABASE_URL', 'postgresql://postgres:dev@localhost:5432/lunchbot_test')
 # Application role URL for RLS-enforced queries
-APP_DB_URL = "postgresql://lunchbot_app:lunchbot_app_dev@localhost:5432/lunchbot_test"
+APP_DB_URL = os.environ.get('APP_DB_URL', 'postgresql://lunchbot_app:lunchbot_app_dev@localhost:5432/lunchbot_test')
 
 
+def _app_role_available():
+    """Check if the lunchbot_app role can connect to the test database."""
+    try:
+        with psycopg.connect(APP_DB_URL, connect_timeout=3) as conn:
+            conn.execute("SELECT 1")
+        return True
+    except psycopg.OperationalError:
+        return False
+
+
+_skip_no_app_role = pytest.mark.skipif(
+    not _app_role_available(),
+    reason='lunchbot_app role not available (run alembic upgrade head to create it)',
+)
+
+
+@_skip_no_app_role
 @pytest.mark.db
 def test_tenant_isolation_restaurants(app, clean_all_tables, tenant_connection, workspace_a, workspace_b):
     """Tenant A inserts restaurant; tenant B cannot see it via app role; tenant A can."""
@@ -48,6 +66,7 @@ def test_tenant_isolation_restaurants(app, clean_all_tables, tenant_connection, 
     assert rows[0]['name'] == 'Alpha Bistro'
 
 
+@_skip_no_app_role
 @pytest.mark.db
 def test_tenant_isolation_polls(app, clean_all_tables, tenant_connection, workspace_a, workspace_b):
     """Tenant A inserts poll; tenant B cannot see it via app role."""
@@ -72,6 +91,7 @@ def test_tenant_isolation_polls(app, clean_all_tables, tenant_connection, worksp
     assert len(rows) == 0, "Tenant B should not see Tenant A's poll"
 
 
+@_skip_no_app_role
 @pytest.mark.db
 def test_tenant_isolation_poll_options_and_votes(app, clean_all_tables, tenant_connection, workspace_a, workspace_b):
     """Tenant A inserts poll+option+vote; tenant B cannot see any of them via app role."""
@@ -130,6 +150,7 @@ def test_tenant_isolation_poll_options_and_votes(app, clean_all_tables, tenant_c
     assert len(votes) == 0, "Tenant B should not see Tenant A's votes"
 
 
+@_skip_no_app_role
 @pytest.mark.db
 def test_fail_closed_no_tenant(app, clean_all_tables, tenant_connection, workspace_a):
     """No tenant context returns empty results via app role (fail-closed behavior)."""
