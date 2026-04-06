@@ -10,6 +10,7 @@ import numpy as np
 from flask import current_app, g
 
 from lunchbot.client import db_client
+from lunchbot.client.workspace_client import get_workspace_settings
 
 logger = logging.getLogger(__name__)
 
@@ -144,8 +145,12 @@ def ensure_poll_options(poll_date=None, workspace_id=None):
     poll_date = poll_date or date.today()
     workspace_id = workspace_id or getattr(g, 'workspace_id', None)
 
-    poll_size = current_app.config['POLL_SIZE']
-    smart_picks_count = current_app.config['SMART_PICKS']
+    # Per-workspace overrides (D-04); fall back to app config
+    ws_settings = get_workspace_settings(workspace_id) if workspace_id else None
+    poll_size = (ws_settings or {}).get('poll_size') or current_app.config['POLL_SIZE']
+    smart_picks_count = (ws_settings or {}).get('smart_picks') or current_app.config['SMART_PICKS']
+    # Ensure smart_picks_count does not exceed poll_size
+    smart_picks_count = min(smart_picks_count, poll_size)
 
     # Step 1: Lazy stats update
     update_stats_lazy(today=poll_date)

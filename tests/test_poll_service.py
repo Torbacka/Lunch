@@ -151,14 +151,34 @@ class TestPushPoll:
 class TestPollChannelFor:
     """Tests for poll_channel_for()."""
 
-    def test_returns_config_channel(self, app):
-        app.config['SLACK_POLL_CHANNEL'] = '#lunch-votes'
+    def test_returns_db_channel_when_set(self, app, clean_all_tables):
+        """poll_channel_for returns workspace DB channel when configured."""
+        app.config['SLACK_POLL_CHANNEL'] = '#fallback'
+        with app.app_context():
+            from lunchbot.client.workspace_client import save_workspace, update_workspace_settings
+            from lunchbot.services.poll_service import poll_channel_for
+            save_workspace('T_CHAN', 'Channel Team', 'enc_token', 'U_BOT', 'chat:write')
+            update_workspace_settings('T_CHAN', poll_channel='#db-channel')
+            assert poll_channel_for('T_CHAN') == '#db-channel'
+
+    def test_falls_back_to_config_when_no_db_channel(self, app, clean_all_tables):
+        """poll_channel_for falls back to config when workspace has no channel."""
+        app.config['SLACK_POLL_CHANNEL'] = '#config-channel'
+        with app.app_context():
+            from lunchbot.client.workspace_client import save_workspace
+            from lunchbot.services.poll_service import poll_channel_for
+            save_workspace('T_NOCHA', 'No Channel Team', 'enc_token', 'U_BOT', 'chat:write')
+            assert poll_channel_for('T_NOCHA') == '#config-channel'
+
+    def test_falls_back_to_config_when_workspace_not_found(self, app, clean_all_tables):
+        """poll_channel_for falls back to config when workspace doesn't exist."""
+        app.config['SLACK_POLL_CHANNEL'] = '#config-fallback'
         with app.app_context():
             from lunchbot.services.poll_service import poll_channel_for
-            assert poll_channel_for('T_TEST') == '#lunch-votes'
+            assert poll_channel_for('T_MISSING') == '#config-fallback'
 
-    def test_returns_empty_when_not_configured(self, app):
+    def test_returns_empty_when_nothing_configured(self, app, clean_all_tables):
         app.config.pop('SLACK_POLL_CHANNEL', None)
         with app.app_context():
             from lunchbot.services.poll_service import poll_channel_for
-            assert poll_channel_for('T_TEST') == ''
+            assert poll_channel_for('T_MISSING') == ''

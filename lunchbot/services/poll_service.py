@@ -10,6 +10,7 @@ from flask import current_app
 
 from lunchbot.client import db_client
 from lunchbot.client import slack_client
+from lunchbot.client.workspace_client import get_workspace_settings
 from lunchbot.services.recommendation_service import ensure_poll_options
 
 logger = logging.getLogger(__name__)
@@ -125,15 +126,15 @@ def build_poll_message(channel, team_id):
 
 
 def poll_channel_for(team_id):
-    """Get the poll channel for a workspace.
-
-    Phase 5 will upgrade this to read from workspace settings in the DB.
-    For now, returns the app-wide config value.
+    """Get the poll channel for a workspace. DB value overrides env var (per D-05).
 
     Args:
-        team_id: Slack team ID (unused until Phase 5 workspace settings)
+        team_id: Slack team ID for workspace lookup
 
     Returns:
-        Channel string from config, or empty string if not configured
+        Channel string from workspace DB row, or config fallback, or empty string
     """
+    settings = get_workspace_settings(team_id)
+    if settings and settings.get('poll_channel'):
+        return settings['poll_channel']
     return current_app.config.get('SLACK_POLL_CHANNEL', '')
