@@ -121,3 +121,49 @@ def get_user_profile(user_id, team_id):
         logger.error('users.info failed for user=%s: %s', user_id, data.get('error', 'unknown'))
         return {}
     return data['user']['profile']
+
+
+def views_publish(user_id, view, team_id):
+    """Publish an App Home tab view for a user.
+
+    Args:
+        user_id: Slack user ID to publish the home tab for
+        view: dict -- the view payload (type: 'home', blocks: [...])
+        team_id: Slack team ID for token resolution
+
+    Returns:
+        Slack API response dict
+    """
+    token = get_bot_token(team_id)
+    response = session.post(
+        SLACK_API + "views.publish",
+        headers=_headers(token),
+        json={'user_id': user_id, 'view': view}
+    )
+    resp_json = response.json()
+    if not resp_json.get('ok'):
+        logger.error('views.publish failed: %s', resp_json.get('error'))
+    return resp_json
+
+
+def views_open(trigger_id, view, team_id):
+    """Open a modal view.
+
+    Args:
+        trigger_id: Slack trigger_id from the interaction payload
+        view: dict -- the modal view payload
+        team_id: Slack team ID for token resolution
+
+    Returns:
+        Slack API response dict
+    """
+    token = get_bot_token(team_id)
+    response = session.post(
+        SLACK_API + "views.open",
+        headers=_headers(token),
+        json={'trigger_id': trigger_id, 'view': view}
+    )
+    resp_json = response.json()
+    if not resp_json.get('ok'):
+        logger.error('views.open failed: %s', resp_json.get('error'))
+    return resp_json
