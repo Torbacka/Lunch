@@ -152,7 +152,19 @@ def _run_poll(team_id, channel):
             logger.warning('poll_channel_missing', team_id=team_id)
             return
         try:
+            import time as _time
             push_poll(resolved_channel, team_id, trigger_source='scheduled')
             logger.info('scheduled_poll_posted', team_id=team_id, channel=resolved_channel)
+            try:
+                _app.extensions['prom_scheduler_success'].labels(workspace_id=team_id).inc()
+                _app.extensions['prom_scheduler_last_run'].labels(workspace_id=team_id).set(_time.time())
+            except KeyError:
+                pass  # metrics not initialized
         except Exception:
             logger.exception('scheduled_poll_failed', team_id=team_id)
+            try:
+                import time as _time
+                _app.extensions['prom_scheduler_failure'].labels(workspace_id=team_id).inc()
+                _app.extensions['prom_scheduler_last_run'].labels(workspace_id=team_id).set(_time.time())
+            except KeyError:
+                pass  # metrics not initialized

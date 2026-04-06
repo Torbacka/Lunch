@@ -31,6 +31,15 @@ def health_check():
             'waiting': stats.get('requests_waiting', 0),
         }
 
+        # Update Prometheus pool gauges on each health check
+        try:
+            prom = current_app.extensions
+            prom['prom_db_pool_size'].set(db_pool['size'])
+            prom['prom_db_pool_idle'].set(db_pool['idle'])
+            prom['prom_db_pool_waiting'].set(db_pool['waiting'])
+        except KeyError:
+            pass  # metrics not initialized (e.g., testing)
+
         return jsonify({
             'status': 'healthy',
             'database': 'connected',

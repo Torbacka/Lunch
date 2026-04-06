@@ -4,6 +4,8 @@ import uuid
 
 import structlog
 from flask import Flask
+from prometheus_client import Counter, Gauge
+from prometheus_flask_exporter import PrometheusMetrics
 from psycopg_pool import ConnectionPool
 
 
@@ -55,6 +57,49 @@ def create_app(config_name='dev'):
     root_logger.setLevel(getattr(logging, app.config.get('LOG_LEVEL', 'INFO')))
 
     logger = structlog.get_logger(__name__)
+
+    # Initialize Prometheus metrics (D-08, D-09)
+    metrics = PrometheusMetrics(app, path='/metrics')
+    app.extensions['metrics'] = metrics
+
+    # Custom business metrics (D-09)
+    app.extensions['prom_polls_posted'] = Counter(
+        'lunchbot_polls_posted_total',
+        'Total polls posted',
+        ['workspace_id'],
+    )
+    app.extensions['prom_votes_cast'] = Counter(
+        'lunchbot_votes_cast_total',
+        'Total votes cast',
+        ['workspace_id'],
+    )
+    app.extensions['prom_scheduler_success'] = Counter(
+        'lunchbot_scheduler_success_total',
+        'Successful scheduled poll executions',
+        ['workspace_id'],
+    )
+    app.extensions['prom_scheduler_failure'] = Counter(
+        'lunchbot_scheduler_failure_total',
+        'Failed scheduled poll executions',
+        ['workspace_id'],
+    )
+    app.extensions['prom_scheduler_last_run'] = Gauge(
+        'lunchbot_scheduler_last_run_timestamp',
+        'Timestamp of last scheduler run per workspace',
+        ['workspace_id'],
+    )
+    app.extensions['prom_db_pool_size'] = Gauge(
+        'lunchbot_db_pool_size',
+        'DB connection pool total size',
+    )
+    app.extensions['prom_db_pool_idle'] = Gauge(
+        'lunchbot_db_pool_idle',
+        'DB connection pool idle connections',
+    )
+    app.extensions['prom_db_pool_waiting'] = Gauge(
+        'lunchbot_db_pool_waiting',
+        'DB connection pool waiting requests',
+    )
 
     # Initialize psycopg3 connection pool (D-05)
     pool = ConnectionPool(

@@ -120,7 +120,12 @@ def push_poll(channel, team_id, trigger_source='manual'):
     options = db_client.get_votes(date.today())
     logger.info('poll_posting', channel=channel, team_id=team_id, restaurant_count=len(options), trigger_source=trigger_source)
     blocks = build_poll_blocks(options)
-    return slack_client.post_message(channel, blocks, team_id)
+    result = slack_client.post_message(channel, blocks, team_id)
+    try:
+        current_app.extensions['prom_polls_posted'].labels(workspace_id=team_id).inc()
+    except (KeyError, RuntimeError):
+        pass  # metrics not initialized or outside app context
+    return result
 
 
 def build_poll_message(channel, team_id, trigger_source='manual'):

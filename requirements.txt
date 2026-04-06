@@ -10,3 +10,4 @@ cryptography==46.0.6
 numpy==2.4.2
 APScheduler>=3.10,<4
 structlog>=24.1.0
+prometheus_flask_exporter>=0.23.0

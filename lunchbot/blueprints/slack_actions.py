@@ -7,7 +7,7 @@ import json
 import structlog
 from datetime import date, time
 
-from flask import Blueprint, request, jsonify, g
+from flask import Blueprint, current_app, request, jsonify, g
 
 from lunchbot.client import places_client, db_client
 from lunchbot.client.workspace_client import get_workspace, get_workspace_settings, update_workspace_settings
@@ -151,6 +151,11 @@ def _handle_legacy_action(payload, first_action):
     if action_type == 'button':
         logger.info('vote_received', poll_option_id=first_action.get('value'))
         vote_service.vote(payload)
+        try:
+            workspace_id = payload.get('team', {}).get('id', 'unknown')
+            current_app.extensions['prom_votes_cast'].labels(workspace_id=workspace_id).inc()
+        except (KeyError, RuntimeError):
+            pass  # metrics not initialized or outside app context
     elif action_type == 'external_select':
         selected = first_action.get('selected_option', {})
         place_id = selected.get('value', '')
