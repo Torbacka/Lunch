@@ -111,10 +111,13 @@ def get_user_profile(user_id, team_id):
         Profile dict from Slack API
     """
     token = get_bot_token(team_id)
-    response = session.post(
-        SLACK_API + "users.profile.get",
-        headers=_form_headers(token),
-        data={'user': user_id}
+    response = session.get(
+        SLACK_API + "users.info",
+        headers=_headers(token),
+        params={'user': user_id}
     )
-    logger.info('Status code: %s response: %s', response.status_code, response.json().get('ok'))
-    return response.json()['profile']
+    data = response.json()
+    if not data.get('ok'):
+        logger.error('users.info failed for user=%s: %s', user_id, data.get('error', 'unknown'))
+        return {}
+    return data['user']['profile']
