@@ -63,6 +63,47 @@ def update_workspace_location(team_id, location):
             logger.info('Updated location for workspace: %s', team_id)
 
 
+def get_workspace_settings(team_id):
+    """Get workspace settings for App Home and scheduler.
+
+    Returns dict with poll_channel, schedule fields, poll_size,
+    smart_picks, location. None if workspace not found or inactive.
+    """
+    with get_pool().connection() as conn:
+        with conn.cursor(row_factory=dict_row) as cur:
+            cur.execute("""
+                SELECT team_id, poll_channel, poll_schedule_time,
+                       poll_schedule_timezone, poll_schedule_weekdays,
+                       poll_size, smart_picks, location
+                FROM workspaces
+                WHERE team_id = %(team_id)s AND is_active = TRUE
+            """, {'team_id': team_id})
+            return cur.fetchone()
+
+
+def update_workspace_settings(team_id, **kwargs):
+    """Update workspace settings columns. Only updates keys present in kwargs.
+
+    Valid keys: poll_channel, poll_schedule_time, poll_schedule_timezone,
+    poll_schedule_weekdays, poll_size, smart_picks, location.
+    """
+    ALLOWED = {'poll_channel', 'poll_schedule_time', 'poll_schedule_timezone',
+                'poll_schedule_weekdays', 'poll_size', 'smart_picks', 'location'}
+    updates = {k: v for k, v in kwargs.items() if k in ALLOWED}
+    if not updates:
+        return
+    set_clause = ', '.join(f'{k} = %({k})s' for k in updates)
+    updates['team_id'] = team_id
+    with get_pool().connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                f"UPDATE workspaces SET {set_clause}, updated_at = NOW() "
+                f"WHERE team_id = %(team_id)s",
+                updates
+            )
+            logger.info('Updated settings for workspace %s: %s', team_id, list(updates.keys()))
+
+
 def deactivate_workspace(team_id):
     """Soft-delete workspace on uninstall. Idempotent.
     Sets is_active=False and uninstalled_at=NOW().
