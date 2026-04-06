@@ -32,7 +32,9 @@ def find_suggestion(search_string, location):
         'key': key,
     }
     response = session.get(PLACES_BASE + 'nearbysearch/json', params=params)
-    return response.json()
+    data = response.json()
+    _check_status(data, 'nearbysearch')
+    return data
 
 
 def find_restaurants_nearby(location, radius=700):
@@ -55,7 +57,9 @@ def find_restaurants_nearby(location, radius=700):
         'key': key,
     }
     response = session.get(PLACES_BASE + 'nearbysearch/json', params=params)
-    return response.json()
+    data = response.json()
+    _check_status(data, 'nearbysearch')
+    return data
 
 
 def get_details(place_id):
@@ -69,4 +73,15 @@ def get_details(place_id):
         'key': key,
     }
     response = session.get(PLACES_BASE + 'details/json', params=params)
-    return response.json()
+    data = response.json()
+    _check_status(data, 'details')
+    return data
+
+
+def _check_status(data, endpoint):
+    """Log warning if Google Places API returned a non-OK status."""
+    status = data.get('status', '')
+    if status != 'OK' and status != 'ZERO_RESULTS':
+        error_msg = data.get('error_message', 'no error message')
+        logger.error('Google Places %s failed: status=%s error=%s',
+                     endpoint, status, error_msg)
