@@ -1,208 +1,184 @@
 # Project Research Summary
 
-**Project:** LunchBot — Multi-tenant Slack lunch bot with web dashboard
-**Domain:** SaaS Slack bot — marketplace distribution, multi-tenancy, smart recommendations
-**Researched:** 2026-04-05
+**Project:** LunchBot — v1.0 Marketplace Launch
+**Domain:** Multi-tenant Slack bot — observability, web presence, and Slack App Directory submission
+**Researched:** 2026-04-06
 **Confidence:** HIGH
 
 ## Executive Summary
 
-LunchBot is an existing single-tenant Slack lunch-decision bot (Flask 1.0 + MongoDB on Google Cloud Functions) that needs to be modernized into a multi-tenant SaaS product distributed via the Slack marketplace. The research is unambiguous on approach: keep Flask (now 3.1.x), replace MongoDB with PostgreSQL 17 using Row-Level Security for tenant isolation, adopt Slack Bolt for Python to handle the OAuth installation flow and multi-workspace token management, and deploy on Docker Compose behind Nginx on the existing home server. The HTMX + Jinja2 frontend keeps the entire stack in Python without introducing a JavaScript build chain.
+LunchBot is a production-ready, self-hosted multi-tenant Slack bot that needs three things to reach the Slack App Directory: structured observability, a compliant web presence (landing page, privacy policy, support page), and passing Slack's functional review process. The core application stack is already complete and running in Docker on PostgreSQL — this milestone is not about building new application features but about production hardening and marketplace compliance. Research confirms the existing stack (Flask 3.1, psycopg3, Alembic, slack_sdk, Gunicorn behind Nginx) covers every technical requirement without new dependencies except for `structlog` for structured logging.
 
-The recommended build order is dictated by hard data dependencies: the PostgreSQL schema with `workspace_id` on all tenant-scoped tables must come first because every subsequent feature rests on it. Multi-tenancy and OAuth come second, enabling all downstream workspace-scoped features. Smart recommendations (Thompson sampling), the web dashboard, and marketplace distribution follow in sequence. Billing is explicitly last — the Slack marketplace does not require paid tiers, and building billing before real users exist is a well-documented scope-creep trap.
+The recommended approach is a strict two-phase structure: build observability first (structured logging, request tracing, Docker healthcheck, enhanced /health endpoint), then tackle web presence and marketplace submission. Observability must precede submission work because it provides the debuggability needed to diagnose issues during a 10-week review window on a self-hosted home server. The entire milestone is low-complexity — the hardest work is administrative (writing a specific privacy policy, recording a YouTube demo video, auditing OAuth scopes) rather than technical.
 
-The top risks are cross-tenant data leakage (mitigated by PostgreSQL RLS as a safety net beyond application-level filtering), Slack's 3-second response timeout (mitigated by immediate acknowledgment + async processing via `response_url`), and marketplace rejection from missing non-code infrastructure such as a landing page, privacy policy, and support page. All three are preventable if addressed in the correct phase rather than deferred to the end.
+The dominant risks are procedural, not technical: Slack will reject apps missing an OAuth `state` parameter, having unjustified scopes, serving a generic privacy policy, or submitting without a 30-90 second YouTube demo video. These are guaranteed rejection reasons that each delay resubmission by 2-4 weeks. A secondary systemic risk is self-hosted uptime — during Slack's up-to-10-week review window, the home server must stay available when reviewers test at unpredictable times. External uptime monitoring must be in place before submission.
 
 ## Key Findings
 
 ### Recommended Stack
 
-The stack is fully resolved with HIGH confidence across the board. The core is Python 3.13 + Flask 3.1 + Slack Bolt 1.27 + PostgreSQL 17 + SQLAlchemy 2.0. The existing codebase is Flask and Slack Bolt has a first-class Flask adapter, making a framework change unjustifiable. SQLAlchemy 2.0 with Alembic/Flask-Migrate handles schema-version-controlled migrations. psycopg 3 (not psycopg2, which is maintenance-only) is the database driver.
+The existing stack requires no architectural changes. The only new dependency is `structlog` (Python library), which wraps stdlib logging so all existing `logger.info()` call sites continue working unchanged. All Slack marketplace technical prerequisites are already satisfied: TLS 1.2+ via Nginx/Let's Encrypt, request signing verification via `middleware/signature.py`, and a working OAuth flow.
 
-The frontend stack is HTMX 2.0 + Jinja2 + Tailwind CSS 4.x via standalone CLI — no Node.js, no JavaScript framework, no separate build pipeline. This is the correct choice for a Python project with an admin dashboard rather than a complex SPA. Thompson sampling is implemented directly with NumPy (20 lines of code), not a third-party bandit library. Stripe 15.x handles billing. Gunicorn runs behind Nginx in Docker Compose, with a self-hosted GitHub Actions runner for CI/CD.
+Web presence (landing page, privacy policy, support page) is served from Flask using Jinja2 templates — both already present as Flask dependencies. No separate container, no static site generator, no CSS build pipeline. A classless CSS framework via CDN (Simple.css or Water.css) provides adequate styling for 3 pages.
 
 **Core technologies:**
-- **Python 3.13 + Flask 3.1:** Runtime and web framework — existing codebase, Bolt has native Flask adapter
-- **Slack Bolt 1.27:** Slack integration — handles OAuth V2 flow, multi-workspace tokens, request verification, and the 3-second acknowledgment pattern natively
-- **PostgreSQL 17 + SQLAlchemy 2.0 + Alembic:** Database layer — replaces MongoDB; RLS enforces tenant isolation; Alembic manages schema migrations
-- **psycopg 3.3:** PostgreSQL driver — modern replacement for psycopg2, 3x faster, native async support
-- **HTMX 2.0 + Jinja2 + Tailwind CSS 4.x:** Web dashboard frontend — no JS framework, no build chain, stays entirely in Python/HTML
-- **NumPy (direct):** Thompson sampling — Beta distribution sampling in ~20 lines, no bandit library needed
-- **Stripe 15.x:** Billing — freemium subscriptions with Checkout; per-workspace billing model
-- **Docker Compose + Nginx + Gunicorn:** Deployment — single `docker compose up`, SSL via Let's Encrypt, static files via Nginx
+- structlog (25.x): Structured JSON logging — wraps stdlib logging, adds bound context (team_id, request_id), environment-aware output (colored dev, JSON prod); the only new pip dependency for this milestone
+- Flask + Jinja2 (existing): Serve landing page, privacy policy, support page — trivial addition to existing routes, no separate container needed
+- Docker json-file log driver (config-only): Log rotation — prevents disk fill from unbounded log growth, no new dependencies
+- Docker HEALTHCHECK (Dockerfile directive): Container auto-restart on failure — single line addition using the existing `/health` endpoint
+
+**What NOT to add:** Prometheus, Grafana, Loki, Fluentd, Beszel, Sentry, Uptime Kuma, React, Next.js, Hugo, Tailwind, or any separate web container. Research confirms all are over-engineering for a single-container self-hosted deployment at this scale.
 
 ### Expected Features
 
-The feature landscape divides cleanly into four buckets: Slack marketplace hard requirements, core bot functionality (much of which already exists), smart/differentiating features, and explicit anti-features.
+Research identifies a clear boundary between Slack-required items (rejection risks if missing) and production quality improvements (differentiators that add reliability during the review window).
 
-**Must have (table stakes):**
-- Slack OAuth V2 installation flow with `state` parameter — marketplace hard requirement, enables distribution
-- Workspace data isolation (`workspace_id` on all tables + RLS) — marketplace security requirement, prevents data leaks
-- Request signature verification on all Slack endpoints — marketplace security requirement
-- Landing page + privacy policy + support page — marketplace infrastructure requirements, often built too late
-- Slash command with help response + ephemeral replies — marketplace UX requirements
-- Configurable poll channel, poll size, poll schedule per workspace — baseline multi-tenant settings
-- Poll auto-close with results summary — users expect polls to conclude
-- App Home tab with onboarding — marketplace expects active Home tab
-- 5+ active workspace installs before submission — marketplace listing prerequisite
+**Must have (table stakes — missing = rejection):**
+- Landing page at app URL — Slack requires "actual web page created specifically for your Slack app"
+- Privacy policy page — must specifically cover LunchBot's actual data (workspace ID, display names, vote history, bot token) with retention period, deletion process, and contact method
+- Support page — email or form, no account signup required, 2 business day response commitment
+- OAuth `state` parameter — currently missing from `oauth.py`; guaranteed rejection without it
+- Scope justification — current scopes (`commands,chat:write,users:read`) appear correct; audit and document each before submission
+- App icon (high-res, unique) — food/lunch-themed, renders cleanly at all sizes
+- Directory screenshots (1600x1000px, 8:5 ratio) — bot in action in a real workspace
+- YouTube demo video (30-90 seconds, closed captions) — full install-to-uninstall flow, recorded in production environment
 
-**Should have (differentiators):**
-- Thompson sampling for smart restaurant picks — the only Slack lunch bot offering algorithmic recommendations
-- Configurable smart/random pick ratio — admin tuning for exploration vs. exploitation
-- Voting history persistence and analytics — feeds Thompson sampling and provides dashboard insights
-- Web admin dashboard (settings, history, billing) — central config surface for admins
-- Restaurant reputation tracking (win rate, satisfaction score) — informs Thompson sampling priors
-- Freemium billing via Stripe — monetization; free tier sufficient for marketplace listing
-- Feature gating based on plan tier — unlocks billing value
+**Should have (differentiators — improve reliability during review window):**
+- structlog structured JSON logging — debuggable production logs, per-workspace request tracing
+- Request ID middleware — trace individual Slack requests through log output
+- Docker HEALTHCHECK — auto-restart on container failure
+- Gunicorn access logging — see all HTTP requests and response times
+- Docker log rotation — prevent disk fill
+- Enhanced /health endpoint — version, uptime, DB pool stats
+- Post-install confirmation page — better UX after OAuth; Slack recommends it
+- External uptime monitoring (UptimeRobot free tier) — alerts on downtime during review window
 
-**Defer (v2+):**
-- Food ordering integration — entirely different problem space
-- Individual user preference profiles — privacy concerns; team-level aggregation is sufficient
-- AI/LLM recommendations — marketplace AI disclosure requirements; Thompson sampling is simpler and more defensible
-- Mobile app — Slack IS the mobile interface
-- Complex permission system — two roles (admin/member) cover all real needs
-- Restaurant management via web dashboard — Slack is the interface for restaurant interaction
+**Defer (post-launch):**
+- Prometheus + Grafana dashboard
+- Loki log aggregation
+- Admin metrics dashboard
+- New application features (Thompson sampling, App Home, scheduled polls are separate future milestones)
 
 ### Architecture Approach
 
-The architecture is a monolithic Flask application with Flask Blueprints separating concerns (Slack events, web dashboard, landing page, auth), a shared service layer for business logic, and PostgreSQL with Row-Level Security as the data store. This is a deliberate monolith — not a microservices architecture — appropriate for a solo developer. Nginx handles SSL termination and route splitting; Gunicorn serves the Flask app. The defining architectural decision is PostgreSQL RLS enforced via a tenant context middleware that sets `app.current_workspace` at the start of every request, making data isolation a database-level guarantee rather than an application-level best effort.
+All additions fit within the existing Flask app — the deployment architecture (Internet → Nginx → Flask/Gunicorn → PostgreSQL) does not change. New components are: one new blueprint (`pages.py` for web presence), one new module (`logging_config.py` for structlog setup), and one new middleware file (`request_id.py` for per-request context binding). The public web pages (`/`, `/privacy`, `/support`) must be added to the signature middleware skip-list alongside existing paths like `/health` and `/slack/install`.
 
 **Major components:**
-1. **Nginx** — SSL termination (Let's Encrypt), route splitting (`/slack/*`, `/dashboard/*`, `/`), static files
-2. **Flask App with Blueprints** — Slack events/commands (Bolt adapter), web dashboard (HTMX), landing page, auth/OAuth callback
-3. **Tenant Context Middleware** — extracts `workspace_id` from every request, sets PostgreSQL session variable for RLS
-4. **Service Layer** — business logic: voting, Thompson sampling, suggestions, emoji tagging, statistics
-5. **Client Layer** — external API abstraction: Slack API (per-workspace token lookup), Google Places API (with caching)
-6. **PostgreSQL 17 with RLS** — shared schema, `workspace_id` on all tenant tables, policies enforce isolation automatically
-7. **APScheduler (in-process)** — daily lunch message scheduler, iterates all active workspaces; migrate to Celery only at 100+ workspaces
+1. `lunchbot/blueprints/pages.py` — renders landing page, privacy policy, and support page from Jinja2 templates; no DB access, no auth
+2. `lunchbot/logging_config.py` — configures structlog with stdlib integration; human-readable in dev, JSON in production
+3. `lunchbot/middleware/request_id.py` — binds `request_id` (and optionally `team_id`) to structlog contextvars at request start; cleared between requests
+4. `lunchbot/blueprints/health.py` (enhanced) — adds version, uptime, and DB pool stats to existing `/health` response
+5. Dockerfile HEALTHCHECK directive — enables Docker-managed container health monitoring using the existing `/health` endpoint
 
 ### Critical Pitfalls
 
-1. **Cross-tenant data leakage** — Use PostgreSQL RLS as the enforcement layer, not just application-level WHERE clauses. One missed filter exposes all workspace data. Build integration tests that attempt cross-tenant access from day one.
+1. **Missing OAuth `state` parameter** — guaranteed marketplace rejection; add state generation, session storage, and callback verification to `oauth.py` before submission; approximately 10-15 lines of code, but overlooked because the flow "works" without it
 
-2. **MongoDB schema inconsistency corrupting migration** — The existing MongoDB collections have inconsistent document structures (field naming bugs are already documented in CONCERNS.md). Audit every collection's actual document shapes before writing migration scripts; handle every variant explicitly; validate row counts post-migration.
+2. **Slack rate limits on non-marketplace apps (May 2025 policy)** — `conversations.history` is throttled to 1 req/minute until marketplace approval; the current architecture already stores poll state in PostgreSQL (correct approach), but must verify no feature reads from Slack message history rather than the database
 
-3. **Slack 3-second response timeout** — The current synchronous Flask architecture will fail Slack's response-time requirement when Google Places API is slow. Acknowledge immediately with HTTP 200 + "thinking..." message; process asynchronously; use `response_url` for the actual poll response.
+3. **`chat.scheduleMessage` silent failure with metadata** — documented Slack API bug: passing `metadata` to `chat.scheduleMessage` returns success but the message never posts; store poll metadata in PostgreSQL keyed by `scheduled_message_id` instead; relevant for the future scheduling milestone — establish the correct pattern now
 
-4. **Marketplace rejection from missing infrastructure** — Landing page, privacy policy, support page, and 5 active installs are non-negotiable prerequisites for submission. Build these as phase deliverables, not as a final polish task.
+4. **Generic or incomplete privacy policy** — Slack reviewers check for specifics about actual data collected; must explicitly name workspace ID, user display names, vote history, and bot token; must state retention period and deletion process; generic templates will be rejected
 
-5. **Home server single point of failure** — Moving from GCF (managed uptime, TLS, scaling) to a home server removes all infrastructure resilience. Mitigate with: DuckDNS dynamic DNS, Traefik/Nginx + Let's Encrypt auto-renewal, `restart: always` on all containers, health checks, and external uptime monitoring before marketplace submission.
+5. **Self-hosted server downtime during 10-week review** — reviewers test at unpredictable times; home server has no SLA; mitigate with external uptime monitoring (UptimeRobot free tier), `restart: unless-stopped` in Docker Compose (already configured), and maintenance scheduled during off-hours (US Pacific time)
 
 ## Implications for Roadmap
 
-Based on the combined research, the phase structure is strongly constrained by data dependencies. The PostgreSQL schema shapes everything; multi-tenancy must precede the dashboard; the dashboard must precede billing; marketplace infrastructure must be built in parallel with OAuth, not after.
+Based on combined research, this milestone maps cleanly to two sequential phases. The dependency chain is clear: observability must precede web presence (provides debugging capability), and both must precede marketplace submission (which requires everything else working and stable before the review clock starts).
 
-### Phase 1: Foundation — PostgreSQL + Docker + Modern Flask
+### Phase 1: Observability and Production Hardening
 
-**Rationale:** Every subsequent phase depends on the database schema and deployment infrastructure. The PostgreSQL data model with `workspace_id` on all tenant-scoped tables must be correct before any service layer is written. Doing this wrong creates a painful retrofit. Docker Compose with Nginx must also be established so the app has a consistent deployment target throughout development.
-**Delivers:** Working Flask 3.1 app factory with Blueprints, SQLAlchemy models, Alembic migrations, Docker Compose stack (app + PostgreSQL + Nginx), basic CI/CD with GitHub Actions self-hosted runner (ephemeral, network-isolated).
-**Addresses:** Flask 1.0 → 3.x breaking changes; MongoDB → PostgreSQL migration (relational schema design, data audit, migration scripts with validation).
-**Avoids:** JSONB shortcut pitfall; incremental Flask upgrade pitfall; self-hosted runner security pitfall.
+**Rationale:** Logging and healthcheck infrastructure must exist before the review window opens. A 10-week review period on a self-hosted home server with no structured logs and no container health monitoring is an unacceptable debugging and reliability risk. This phase has zero Slack submission dependencies and can be completed independently first.
 
-### Phase 2: Multi-Tenancy Core — OAuth + RLS + Token Management
+**Delivers:** Structured JSON logs with per-request tracing, Docker container health monitoring, HTTP access log visibility, disk-safe log rotation, enriched health endpoint
 
-**Rationale:** Multi-tenancy is not a feature that can be layered on later. The tenant context middleware, RLS policies, and OAuth installation flow must be the foundation all Slack interactions are built on. The existing single-token pattern (`os.environ['SLACK_TOKEN']`) must be replaced with per-workspace token lookup before any other Slack work is done.
-**Delivers:** Slack OAuth V2 installation flow (Bolt's built-in handler), `installations` table with encrypted token storage, tenant context middleware setting `app.current_workspace` on every request, RLS policies on all tenant-scoped tables, workspace uninstall handling, request signature verification on all endpoints.
-**Addresses:** Multi-tenant data isolation; per-workspace bot token routing; OAuth security (state parameter, token encryption).
-**Avoids:** Cross-tenant data leakage pitfall; plain-text token storage pitfall; token resolution bug (test multi-install scenarios explicitly).
+**Addresses:** structlog configuration, request ID middleware, Gunicorn access logging, Docker HEALTHCHECK, Docker log rotation, enhanced /health endpoint
 
-### Phase 3: Core Bot Modernization — Slack Integration Rewrite
+**Avoids:**
+- Pitfall 9 (retrofitting logging without breaking existing format — use env-based format switching: colored in dev, JSON in prod)
+- Pitfall 10 (high-cardinality Prometheus labels — skip Prometheus entirely for this scale)
+- Pitfall 15 (server downtime during review — set up external uptime monitoring before any submission activity)
 
-**Rationale:** With the data layer and multi-tenancy in place, migrate the existing slash commands, vote handling, and daily message scheduling to the new Blueprints structure. This is also where the Slack 3-second timeout must be fixed and Block Kit fragility resolved.
-**Delivers:** All existing bot functionality (slash commands, restaurant search, voting, emoji tagging, scheduled messages) working in the multi-tenant model; Block Kit interactions using `block_id`/`action_id` instead of positional indexing; async acknowledgment pattern for slash commands; Google Places API caching (PostgreSQL with TTL); APScheduler for multi-workspace daily message iteration; configurable poll channel, poll size, schedule per workspace.
-**Addresses:** Slack 3-second timeout; Block Kit fragility; Google Places API cost scaling.
-**Avoids:** Synchronous blocking pitfall; per-workspace cost explosion.
+**Stack changes:** Add `structlog` to requirements.txt; add `logging_config.py` and `request_id.py` middleware; update Dockerfile with HEALTHCHECK directive; update docker-compose.yml with json-file log driver config; update entrypoint.sh with `--access-logfile -` gunicorn flag
 
-### Phase 4: Smart Features — Thompson Sampling + Vote History
+### Phase 2: Web Presence and Marketplace Submission
 
-**Rationale:** Thompson sampling requires vote history, which requires the correct PostgreSQL schema from Phase 1. The algorithm itself is simple but the prior strategy (avoiding Beta(1,1) cold-start over-exploration) must be designed before rolling out to multiple workspaces.
-**Delivers:** Vote history persistence in PostgreSQL (prerequisite for all analytics); Thompson sampling service using NumPy with informed priors (Beta(1,2) or calibrated from cuisine preferences); configurable smart/random pick ratio per workspace; poll auto-close with results summary; restaurant reputation tracking (win rate, avg votes).
-**Addresses:** Cold-start over-exploration (informed priors, pessimistic initialization); per-workspace convergence.
-**Avoids:** Thompson sampling prior miscalibration pitfall.
+**Rationale:** Requires Phase 1 to be complete — debuggable logs are needed when testing OAuth flows and web pages in production. This phase carries the highest risk of rejection-causing mistakes and must be treated as a compliance checklist, not a sprint. The OAuth `state` parameter fix is the single highest-priority item and must be the first task in this phase.
 
-### Phase 5: Web Dashboard + Marketplace Infrastructure
+**Delivers:** Working landing page with "Add to Slack" button, privacy policy page, support page, OAuth CSRF protection (state parameter), scope audit documentation, app icon, directory screenshots, YouTube demo video, and submitted marketplace listing
 
-**Rationale:** The dashboard requires the OAuth "Sign in with Slack" flow (which builds on the Phase 2 OAuth work) and meaningful data to display (which requires Phase 4 vote history). The landing page and legal pages are also marketplace prerequisites and should ship together with the dashboard.
-**Delivers:** Landing page with "Add to Slack" button; privacy policy and support pages; web admin dashboard (settings UI, voting history analytics, billing management placeholder); "Sign in with Slack" session auth for dashboard; App Home tab with onboarding for first-time installs.
-**Addresses:** Slack marketplace infrastructure requirements (landing page, privacy policy, support page).
-**Avoids:** Marketplace rejection from missing infrastructure; dashboard feature creep (settings-first, expand based on users).
+**Addresses:** All table-stakes items (landing page, privacy policy, support page, OAuth state, scope audit, icon, screenshots, demo video)
 
-### Phase 6: Billing + Marketplace Submission
+**Avoids:**
+- Pitfall 1 (missing OAuth state — fix first, before any other Phase 2 work begins)
+- Pitfall 2 (unjustified scopes — audit and document before submission)
+- Pitfall 4 (missing or incomplete video demo — record last, after everything works in production)
+- Pitfall 11 (OAuth redirect URI mismatch — host landing page on same domain as API; link to `/slack/install`, not directly to Slack's OAuth URL)
+- Pitfall 13 (rate limit cliff — store all poll state in PostgreSQL, never read from Slack message history; submit for approval promptly)
+- Pitfall 16 (generic privacy policy — write specifically for LunchBot's actual data practices, not from a generic template)
 
-**Rationale:** Billing is explicitly last. The marketplace does not require paid tiers for listing. Billing before validation is a well-documented scope-creep trap. Build it only after the app is listed and real users exist to validate willingness to pay.
-**Delivers:** Stripe freemium integration (free plan + paid plan Prices, Checkout for upgrades, webhook for subscription lifecycle); feature gating (free tier: limited polls/week; paid tier: Thompson sampling, analytics, configurable schedule, unlimited polls); plan status stored in PostgreSQL; 5+ active workspace installs recruited for marketplace submission; marketplace submission.
-**Addresses:** Freemium billing; feature gating; marketplace submission checklist.
-**Avoids:** Billing scope creep delaying launch pitfall.
+**Stack changes:** Add `pages` blueprint; add Jinja2 templates for landing page, privacy policy, and support page; add public paths (`/`, `/privacy`, `/support`) to signature middleware skip-list; optionally add Simple.css via CDN
 
 ### Phase Ordering Rationale
 
-- PostgreSQL schema design must precede all data work — retrofitting `workspace_id` and RLS after service layer code is written is a painful, error-prone migration.
-- OAuth and RLS must precede the dashboard — the dashboard session is workspace-scoped, requiring multi-tenant auth to already work.
-- Vote history must precede Thompson sampling — the algorithm has no data to learn from without it.
-- Landing page and legal pages ship with the dashboard (Phase 5), not at the end — marketplace rejection risk is too high if left for Phase 6.
-- Billing is last to avoid the well-documented trap of building monetization before validated demand.
+- Phase 1 before Phase 2: structured logs and container health monitoring are prerequisites for confidently debugging the OAuth flow and web presence in production; also provide the observability needed to detect issues during the review window
+- OAuth `state` parameter fix is the first task in Phase 2, not Phase 1 — it is a marketplace prerequisite, not an observability concern, but it must not wait until the end
+- Video demo is the last task in Phase 2 — it must show the full install-to-uninstall flow working in production; recording it before everything else is complete means re-recording
+- External uptime monitoring should be set up at the end of Phase 1, before any submission activity begins
+- App icon design has an uncertain timeline and should begin in parallel with Phase 1, not deferred to Phase 2
+- Beta tester recruitment (5 workspaces required) is a social constraint with a long lead time — begin outreach during Phase 1
 
 ### Research Flags
 
 Phases likely needing deeper research during planning:
-- **Phase 2 (OAuth + RLS):** Bolt's `InstallationStore` interface has a documented token resolution bug with mixed install types. The custom encrypted store implementation needs careful research against current Bolt docs before implementation.
-- **Phase 4 (Thompson Sampling):** Prior calibration strategy for cold-start is an active research area (Dynamic Prior Thompson Sampling, arXiv 2025). The implementation is simple but prior tuning requires more domain-specific research during planning.
-- **Phase 6 (Stripe + Marketplace):** Stripe's per-workspace billing model and webhook handling for failed payments has many edge cases. Slack marketplace review process timing and feedback loop are unpredictable.
 
-Phases with standard patterns (skip research-phase):
-- **Phase 1 (Foundation):** Flask app factory, SQLAlchemy models, Alembic migrations, and Docker Compose with Nginx are thoroughly documented with high-confidence sources. Standard patterns apply directly.
-- **Phase 3 (Bot Modernization):** Bolt for Python slash command and event handling are well-documented. The async acknowledgment pattern is explicitly covered in Bolt docs.
-- **Phase 5 (Dashboard):** HTMX + Jinja2 admin dashboard patterns are standard. "Sign in with Slack" OAuth for web sessions is a direct extension of the Phase 2 OAuth work.
+- **Phase 2 (OAuth state parameter):** The existing OAuth flow in `oauth.py` needs a specific implementation audit to determine whether session-based or short-lived cache-based state storage is appropriate for the stateless self-hosted deployment. Also verify that `_redirect_uri()` handles `X-Forwarded-Host` correctly if the landing page is served from the same domain via nginx.
+- **Phase 2 (privacy policy content):** Legal content requires walking the actual database schema to enumerate all PII stored per workspace before drafting. Cannot be written from research alone — it requires a code audit first.
+
+Phases with standard patterns (research-phase not needed):
+
+- **Phase 1 (structlog integration):** Official structlog documentation is comprehensive; the stdlib integration pattern is fully documented with working code examples already reproduced in ARCHITECTURE.md. Standard implementation.
+- **Phase 1 (Docker healthcheck + log rotation):** Dockerfile HEALTHCHECK and docker-compose log driver configuration are 5-line additions with no ambiguity. Official Docker docs are authoritative.
+- **Phase 2 (web pages):** Three static Flask routes with Jinja2 templates — the most standard Flask pattern possible.
 
 ## Confidence Assessment
 
 | Area | Confidence | Notes |
 |------|------------|-------|
-| Stack | HIGH | All technologies verified against official release pages. Version recommendations are specific and current (April 2026). The "keep Flask" decision is well-supported by ecosystem analysis. |
-| Features | HIGH | Slack marketplace requirements verified directly against official Slack docs. Thompson sampling backed by Stanford tutorial and production case studies. Competitive landscape is thin (advantage to LunchBot). |
-| Architecture | HIGH | Monolith with Blueprints + RLS is the consensus pattern for this scale. PostgreSQL RLS implementation backed by AWS and Crunchy Data documentation. Flask Blueprint structure is standard and well-documented. |
-| Pitfalls | HIGH | Critical pitfalls sourced from official Slack docs, PostgreSQL docs, and post-mortems. The MongoDB-to-PostgreSQL JSONB antipattern is explicitly quantified (45% of failed migrations). Token resolution bug is a tracked GitHub issue. |
+| Stack | HIGH | Single new dependency (structlog); all other additions are configuration changes. Official docs consulted for all decisions. No version ambiguity. |
+| Features | HIGH | Table-stakes list derived directly from official Slack Marketplace Guidelines and Review Guide. No speculation or inference involved. |
+| Architecture | HIGH | Changes are purely additive — one new blueprint, two new modules, config file changes. No structural risk. Existing architecture is unchanged. |
+| Pitfalls | HIGH | 8 of 16 pitfalls sourced from official Slack documentation or official API changelogs. OAuth state, rate limits, and video requirements are confirmed rejection criteria with direct citations. |
 
 **Overall confidence:** HIGH
 
 ### Gaps to Address
 
-- **Data migration scope:** The existing MongoDB data volume and document inconsistency level is unknown until a full audit runs. The migration script complexity could vary significantly. Plan buffer time in Phase 1.
-- **Home server capacity:** Whether the existing home server has sufficient resources (RAM, CPU, storage) for PostgreSQL 17 + Flask + Nginx simultaneously is unverified. Assess before committing to Docker Compose resource allocations.
-- **Google Places API quota:** Current usage/quota limits on the existing Google Cloud project are unknown. Multi-tenant scaling may hit quota limits before caching is in place. Audit current quota and set billing alerts early in Phase 3.
-- **Tailwind standalone CLI workflow:** The Tailwind 4.x standalone CLI for a Flask project is classified MEDIUM confidence — the workflow specifics may need validation during Phase 5 dashboard work.
-- **Thompson sampling prior tuning values:** Beta(1,2) as a pessimistic prior is a reasonable starting point but the optimal initialization for a lunch bot context is not established in available literature. Requires empirical tuning after launch.
+- **OAuth `state` implementation detail:** Research confirms the requirement and the approximate scope of the fix, but the specific implementation (session vs. short-lived PostgreSQL cache for state storage) needs a quick audit of how existing session infrastructure is configured. Low risk, but verify before writing code.
+- **Scope audit result unknown:** Research confirms `commands,chat:write,users:read` is the current scope set and appears sufficient, but a code-level audit is needed to verify no feature silently calls Slack API methods that require undeclared scopes.
+- **App icon timeline:** Designing or commissioning a quality app icon has an uncertain timeline. If this is a bottleneck, it must be started in parallel with Phase 1, not deferred to Phase 2.
+- **Beta tester recruitment:** Slack requires the app to be installed on at least 5 workspaces before approval. This is a social constraint with a long lead time — begin outreach during Phase 1.
+- **Slack review timeline:** Research found anecdotal references to 1-10 weeks but no official SLA. Plan for potential back-and-forth revision cycles and do not treat submission as the end of the milestone.
 
 ## Sources
 
 ### Primary (HIGH confidence)
-- [Flask 3.1.x releases](https://github.com/pallets/flask/releases)
-- [SQLAlchemy 2.0.49](https://www.sqlalchemy.org/download.html)
-- [psycopg 3.3.3](https://pypi.org/project/psycopg/)
-- [Slack Bolt for Python](https://docs.slack.dev/tools/bolt-python/)
-- [Slack Marketplace Guidelines](https://docs.slack.dev/slack-marketplace/slack-marketplace-app-guidelines-and-requirements/)
-- [Slack Marketplace Review Guide](https://docs.slack.dev/slack-marketplace/slack-marketplace-review-guide/)
-- [Slack OAuth V2 Documentation](https://docs.slack.dev/authentication/installing-with-oauth/)
-- [PostgreSQL RLS Documentation](https://www.postgresql.org/docs/current/ddl-rowsecurity.html)
-- [AWS: Multi-tenant data isolation with PostgreSQL RLS](https://aws.amazon.com/blogs/database/multi-tenant-data-isolation-with-postgresql-row-level-security/)
-- [Stripe Python SDK 15.x](https://pypi.org/project/stripe/)
-- [HTMX 2.0.x](https://htmx.org/)
-- [Gunicorn 25.x](https://pypi.org/project/gunicorn/)
+- [Slack Marketplace App Guidelines and Requirements](https://docs.slack.dev/slack-marketplace/slack-marketplace-app-guidelines-and-requirements/) — table stakes features, OAuth state requirement, scope review criteria
+- [Slack Marketplace Review Guide](https://docs.slack.dev/slack-marketplace/slack-marketplace-review-guide/) — review process, video requirements, App Home review criteria
+- [Slack Rate Limit Changes (May 2025)](https://docs.slack.dev/changelog/2025/05/29/rate-limit-changes-for-non-marketplace-apps/) — `conversations.history` throttling for non-marketplace apps
+- [Slack Rate Limit Clarification (June 2025)](https://docs.slack.dev/changelog/2025/06/03/rate-limits-clarity/) — confirmed scope and applicability of rate limit changes
+- [structlog Documentation](https://www.structlog.org/en/stable/standard-library.html) — stdlib integration pattern, processor chains
+- [Flask Logging Documentation](https://flask.palletsprojects.com/en/stable/logging/) — official guidance on logging in Flask apps
+- [Docker HEALTHCHECK Reference](https://docs.docker.com/reference/dockerfile/#healthcheck) — healthcheck syntax and semantics
+- [chat.scheduleMessage API Reference](https://docs.slack.dev/reference/methods/chat.scheduleMessage/) — metadata parameter silent failure bug
+- [Slack Security Review Requirements](https://docs.slack.dev/slack-marketplace/marketplace-terms-conditions/slack-security-review/) — security prerequisites for marketplace listing
 
 ### Secondary (MEDIUM confidence)
-- [Crunchy Data: Row Level Security for Tenants](https://www.crunchydata.com/blog/row-level-security-for-tenants-in-postgres)
-- [TestDriven.io: Dockerizing Flask with Postgres, Gunicorn, and Nginx](https://testdriven.io/blog/dockerizing-flask-with-postgres-gunicorn-and-nginx/)
-- [psycopg2 vs psycopg3 benchmarks](https://www.tigerdata.com/blog/psycopg2-vs-psycopg3-performance-benchmark)
-- [myoung34/docker-github-actions-runner](https://github.com/myoung34/docker-github-actions-runner)
-- [Thompson Sampling for Recommendations — Towards Data Science](https://towardsdatascience.com/now-why-should-we-care-about-recommendation-systems-ft-a-soft-introduction-to-thompson-sampling-b9483b43f262/)
-- [MongoDB to PostgreSQL Migration Lessons — Medium](https://medium.com/lets-code-future/mongodb-to-postgresql-migration-3-months-2-mental-breakdowns-1-lesson-2980110461a5)
-- [Top 7 PostgreSQL Migration Mistakes — TechBuddies](https://www.techbuddies.io/2025/12/14/top-7-postgresql-migration-mistakes-developers-regret-later/)
-- [GitHub Actions Self-Hosted Runner Security — Sysdig](https://www.sysdig.com/blog/how-threat-actors-are-using-self-hosted-github-actions-runners-as-backdoors)
-
-### Tertiary (LOW/needs validation)
-- [Dynamic Prior Thompson Sampling — arXiv 2025](https://arxiv.org/abs/2602.00943) — prior calibration strategy, needs implementation validation
-- [Bolt Python token resolution bug](https://github.com/slackapi/python-slack-sdk/issues/1441) — may be fixed in current Bolt version, verify during Phase 2
+- [5 Reasons Why Slack Will Reject Your App](https://dev.to/tomquirk/5-reasons-why-slack-will-reject-your-slack-app-39m8) — developer experience report on common rejection reasons
+- [Docker Logging Best Practices](https://oneuptime.com/blog/post/2026-01-30-docker-logging-best-practices/view) — json-file driver configuration guidance
+- [tokens_revoked Event Ordering Issue](https://github.com/slackapi/bolt-js/issues/673) — documented Slack event ordering behavior, relevant to uninstall handling
+- [Dynamic Prior Thompson Sampling (arXiv 2025)](https://arxiv.org/abs/2602.00943) — prior selection for sparse per-workspace data (relevant to future Thompson sampling milestone)
 
 ---
-*Research completed: 2026-04-05*
+*Research completed: 2026-04-06*
 *Ready for roadmap: yes*
