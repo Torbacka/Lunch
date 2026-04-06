@@ -3,7 +3,7 @@
 Builds Slack Block Kit poll messages from PostgreSQL poll options
 and posts them via the per-workspace Slack client.
 """
-import logging
+import structlog
 from datetime import date
 
 from flask import current_app
@@ -13,7 +13,7 @@ from lunchbot.client import slack_client
 from lunchbot.client.workspace_client import get_workspace_settings
 from lunchbot.services.recommendation_service import ensure_poll_options
 
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger(__name__)
 
 
 def build_poll_blocks(options):
@@ -101,7 +101,7 @@ def build_poll_blocks(options):
     return blocks
 
 
-def push_poll(channel, team_id):
+def push_poll(channel, team_id, trigger_source='manual'):
     """Build and post today's lunch poll to a Slack channel.
 
     Fetches today's poll options from the database, constructs Block Kit
@@ -110,19 +110,22 @@ def push_poll(channel, team_id):
     Args:
         channel: Slack channel ID or name to post to
         team_id: Slack team ID for workspace token resolution
+        trigger_source: Who triggered the poll ('manual' or 'scheduled')
 
     Returns:
         Slack API response dict
     """
+    logger.info('poll_building', channel=channel, team_id=team_id, trigger_source=trigger_source)
     ensure_poll_options(poll_date=date.today())
     options = db_client.get_votes(date.today())
+    logger.info('poll_posting', channel=channel, team_id=team_id, restaurant_count=len(options), trigger_source=trigger_source)
     blocks = build_poll_blocks(options)
     return slack_client.post_message(channel, blocks, team_id)
 
 
-def build_poll_message(channel, team_id):
+def build_poll_message(channel, team_id, trigger_source='manual'):
     """Alias for push_poll. Used by some blueprints."""
-    return push_poll(channel, team_id)
+    return push_poll(channel, team_id, trigger_source=trigger_source)
 
 
 def poll_channel_for(team_id):

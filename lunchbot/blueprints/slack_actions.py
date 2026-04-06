@@ -4,7 +4,7 @@ Handles: /action (vote clicks, suggestion select, App Home buttons, modal submis
          /find_suggestions (external select search).
 """
 import json
-import logging
+import structlog
 from datetime import date, time
 
 from flask import Blueprint, request, jsonify, g
@@ -23,7 +23,7 @@ from lunchbot.services.app_home_service import (
 )
 from lunchbot.services.scheduler_service import update_schedule_job, remove_schedule_job
 
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger(__name__)
 
 bp = Blueprint('slack_actions', __name__)
 
@@ -67,7 +67,7 @@ def action():
     """
     payload = json.loads(request.form.get('payload', '{}'))
     payload_type = payload.get('type')
-    logger.info('Received action type: %s', payload_type)
+    logger.info('slack_action_received', payload_type=payload_type)
 
     if payload_type == 'view_submission':
         return _handle_view_submission(payload)
@@ -149,10 +149,13 @@ def _handle_legacy_action(payload, first_action):
     """Handle existing vote and suggestion actions (pre-Phase 5 logic)."""
     action_type = first_action.get('type')
     if action_type == 'button':
+        logger.info('vote_received', poll_option_id=first_action.get('value'))
         vote_service.vote(payload)
     elif action_type == 'external_select':
         selected = first_action.get('selected_option', {})
-        suggest(selected.get('value', ''))
+        place_id = selected.get('value', '')
+        logger.info('suggestion_selected', place_id=place_id)
+        suggest(place_id)
     return '', 200
 
 
@@ -162,6 +165,7 @@ def _handle_view_submission(payload):
     private_metadata = json.loads(payload.get('view', {}).get('private_metadata', '{}'))
     team_id = private_metadata.get('team_id')
     user_id = payload.get('user', {}).get('id')
+    logger.info('modal_submitted', callback_id=callback_id, team_id=team_id)
     values = payload.get('view', {}).get('state', {}).get('values', {})
 
     if not team_id:
@@ -277,7 +281,7 @@ def find_suggestions():
     """
     payload = json.loads(request.form.get('payload', '{}'))
     search_value = payload.get('value', '')
-    logger.info('Received suggestion search: %s', search_value)
+    logger.info('suggestion_search', search_value=search_value)
 
     workspace = get_workspace(g.workspace_id)
     location = workspace.get('location') if workspace else None
