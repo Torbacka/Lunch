@@ -61,3 +61,14 @@ def search_and_update_emoji(location):
 
     db_client.save_restaurants({'results': results})
     logger.info('Saved %d restaurants near %s', len(results), location)
+
+    # Fetch website/url details for each restaurant
+    for r in results:
+        place_id = r['place_id']
+        details = places_client.get_details(place_id)
+        result = details.get('result', {})
+        website = result.get('website', '')
+        url = result.get('url', '')
+        if website or url:
+            db_client.update_restaurant_urls(place_id, website=website, url=url)
+            logger.info('Details for %s: website=%s', r.get('name', '?'), website or url)

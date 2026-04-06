@@ -83,14 +83,16 @@ def build_poll_blocks(options):
                 }]
             })
 
-        # URL context block
-        blocks.append({
-            'type': 'context',
-            'elements': [{
-                'type': 'mrkdwn',
-                'text': f'For more info: {option.get("url", "")}'
-            }]
-        })
+        # URL context block — prefer website (restaurant page), fall back to Google Maps url
+        link = option.get('website') or option.get('url') or ''
+        if link:
+            blocks.append({
+                'type': 'context',
+                'elements': [{
+                    'type': 'mrkdwn',
+                    'text': f'<{link}|More info>'
+                }]
+            })
 
         # Divider
         blocks.append({'type': 'divider'})

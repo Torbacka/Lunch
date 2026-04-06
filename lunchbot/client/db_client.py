@@ -178,6 +178,20 @@ def save_restaurants(restaurants_response):
     return ids
 
 
+def update_restaurant_urls(place_id, website='', url=''):
+    """Update website and url for a restaurant by place_id."""
+    workspace_id = getattr(g, 'workspace_id', None)
+    with get_pool().connection() as conn:
+        if workspace_id:
+            conn.execute(f"SET app.current_tenant = '{workspace_id}'")
+        with conn.cursor() as cur:
+            cur.execute("""
+                UPDATE restaurants
+                SET website = %(website)s, url = %(url)s, updated_at = NOW()
+                WHERE place_id = %(place_id)s
+            """, {'place_id': place_id, 'website': website, 'url': url})
+
+
 def add_emoji(place_ids, emoji_string):
     """Update emoji for multiple restaurants. Replaces mongo_client.add_emoji().
     Returns count of updated rows.
