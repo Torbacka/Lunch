@@ -6,7 +6,7 @@ from slack_sdk.signature import SignatureVerifier
 logger = logging.getLogger(__name__)
 
 # Paths that skip signature verification
-SKIP_PATHS = frozenset(['/health', '/slack/install', '/slack/oauth_redirect', '/slack/setup'])
+SKIP_PATHS = frozenset(['/health', '/slack/install', '/slack/oauth_redirect', '/slack/setup', '/seed', '/lunch_message'])
 
 
 def verify_slack_signature():
