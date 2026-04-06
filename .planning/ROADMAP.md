@@ -127,11 +127,13 @@ Plans:
   2. Docker container automatically restarts on failure via HEALTHCHECK and the /health endpoint reports version, uptime, and database pool status
   3. Log rotation is configured to prevent disk fill on the home server
   4. External uptime monitoring is active and alerts on downtime (must be running before marketplace submission)
-**Plans**: TBD
+**Plans**: 4 plans
 
 Plans:
-- [ ] 06-01: TBD
-- [ ] 06-02: TBD
+- [ ] 06-01-PLAN.md -- Structured logging foundation (structlog init, request context binding, stdlib bridge)
+- [ ] 06-02-PLAN.md -- Service-layer logging (poll_service, slack_actions, scheduler_service, oauth events)
+- [ ] 06-03-PLAN.md -- Health endpoint enhancement, Docker HEALTHCHECK, log rotation
+- [ ] 06-04-PLAN.md -- Prometheus + Grafana metrics stack, custom metrics, uptime alerting via Resend SMTP
 
 ### Phase 7: Web Presence
 **Goal**: LunchBot has a public web presence with landing page, privacy policy, and support page served from the existing Flask app
@@ -177,6 +179,6 @@ Note: Phase 6 (Observability) depends on Phase 3, not Phase 5. It could theoreti
 | 3. Core Bot Migration | 3/3 | Complete | 2026-04-04 |
 | 4. Smart Recommendations | 0/0 | Not started | - |
 | 5. Poll Automation and Onboarding | 0/3 | Planned | - |
-| 6. Observability | 0/0 | Not started | - |
+| 6. Observability | 0/4 | Planned | - |
 | 7. Web Presence | 0/0 | Not started | - |
 | 8. Marketplace Submission | 0/0 | Not started | - |
