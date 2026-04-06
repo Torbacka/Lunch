@@ -58,23 +58,30 @@ def build_poll_blocks(options):
             }
         })
 
-        # Vote count context block
-        votes = option.get('votes') or []
-        if votes:
-            count = len(votes)
-            vote_word = 'vote' if count == 1 else 'votes'
-            vote_text = f'{count} {vote_word}'
+        # Vote count context block (with voter avatars if available)
+        voter_elements = option.get('voter_elements')
+        if voter_elements:
+            blocks.append({
+                'type': 'context',
+                'elements': voter_elements
+            })
         else:
-            vote_text = 'No votes'
+            votes = option.get('votes') or []
+            if votes:
+                count = len(votes)
+                vote_word = 'vote' if count == 1 else 'votes'
+                vote_text = f'{count} {vote_word}'
+            else:
+                vote_text = 'No votes'
 
-        blocks.append({
-            'type': 'context',
-            'elements': [{
-                'type': 'plain_text',
-                'emoji': True,
-                'text': vote_text
-            }]
-        })
+            blocks.append({
+                'type': 'context',
+                'elements': [{
+                    'type': 'plain_text',
+                    'emoji': True,
+                    'text': vote_text
+                }]
+            })
 
         # URL context block
         blocks.append({
