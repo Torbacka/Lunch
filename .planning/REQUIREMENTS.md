@@ -37,44 +37,44 @@ Requirements for v1.0 Marketplace Launch. Each maps to roadmap phases.
 
 ### Smart Recommendations
 
-- [ ] **BOT-05**: Thompson sampling selects 1-2 historically liked restaurants per poll
-- [ ] **BOT-06**: Remaining poll slots filled with random restaurant suggestions not recently shown
-- [ ] **BOT-07**: Admin configures total poll size and smart/random ratio per workspace
-- [ ] **BOT-11**: Restaurant reputation tracking (win rate, times shown, vote counts) updated after each poll
+- [ ] **BOT-05**: Thompson sampling selects 1-2 historically liked restaurants per poll — Phase 4
+- [ ] **BOT-06**: Remaining poll slots filled with random restaurant suggestions not recently shown — Phase 4
+- [ ] **BOT-07**: Admin configures total poll size and smart/random ratio per workspace — Phase 4
+- [ ] **BOT-11**: Restaurant reputation tracking (win rate, times shown, vote counts) updated after each poll — Phase 4
 
 ### Poll Automation
 
-- [ ] **BOT-08**: Poll auto-closes after configurable duration with winner summary posted to channel
-- [ ] **BOT-09**: Admin configures recurring poll schedule (time, timezone, weekdays) per workspace
+- [ ] **BOT-08**: Poll auto-closes after configurable duration with winner summary posted to channel — Phase 5
+- [ ] **BOT-09**: Admin configures recurring poll schedule (time, timezone, weekdays) per workspace — Phase 5
 
 ### App Home & Onboarding
 
-- [ ] **BOT-10**: App Home tab with onboarding flow guides new workspace through initial setup
+- [ ] **BOT-10**: App Home tab with onboarding flow guides new workspace through initial setup — Phase 5
 
 ### Observability
 
-- [ ] **OBS-01**: Application emits structured JSON logs with workspace context in production (structlog)
-- [ ] **OBS-02**: Each Slack request is traceable via unique request ID in log output
-- [ ] **OBS-03**: Docker container monitors its own health and auto-restarts on failure (HEALTHCHECK)
-- [ ] **OBS-04**: Log rotation prevents disk fill on the home server (Docker json-file driver config)
-- [ ] **OBS-05**: /health endpoint reports application version, uptime, and database pool status
-- [ ] **OBS-06**: External uptime monitoring alerts on downtime (required before submission — review window is up to 10 weeks)
+- [ ] **OBS-01**: Application emits structured JSON logs with workspace context in production (structlog) — Phase 6
+- [ ] **OBS-02**: Each Slack request is traceable via unique request ID in log output — Phase 6
+- [ ] **OBS-03**: Docker container monitors its own health and auto-restarts on failure (HEALTHCHECK) — Phase 6
+- [ ] **OBS-04**: Log rotation prevents disk fill on the home server (Docker json-file driver config) — Phase 6
+- [ ] **OBS-05**: /health endpoint reports application version, uptime, and database pool status — Phase 6
+- [ ] **OBS-06**: External uptime monitoring alerts on downtime (required before submission — review window is up to 10 weeks) — Phase 6
 
 ### Web Presence
 
-- [ ] **WEB-01**: Landing page describes LunchBot with a working "Add to Slack" button
-- [ ] **WEB-02**: Privacy policy page documents all data collected, retention periods, and deletion process (LunchBot-specific, not a generic template)
-- [ ] **WEB-03**: Support page provides contact method with 2-business-day response commitment
+- [ ] **WEB-01**: Landing page describes LunchBot with a working "Add to Slack" button — Phase 7
+- [ ] **WEB-02**: Privacy policy page documents all data collected, retention periods, and deletion process (LunchBot-specific, not a generic template) — Phase 7
+- [ ] **WEB-03**: Support page provides contact method with 2-business-day response commitment — Phase 7
 
 ### Marketplace Submission
 
-- [ ] **MKT-01**: OAuth installation flow includes CSRF state parameter (currently missing — guaranteed rejection without it)
-- [ ] **MKT-02**: All Slack permission scopes are audited and each is documented with justification
-- [ ] **MKT-03**: App icon meets Slack requirements (1024x1024px, unique, food/lunch themed)
-- [ ] **MKT-04**: App directory screenshots show the bot in action (minimum 3, 1600x1000px, 8:5 ratio)
-- [ ] **MKT-05**: YouTube demo video shows full install-to-uninstall flow (30-90 seconds, closed captions)
-- [ ] **MKT-06**: Bot is installed on 5+ active workspaces via beta rollout before submission
-- [ ] **MKT-07**: App is submitted to Slack App Directory and review process initiated
+- [ ] **MKT-01**: OAuth installation flow includes CSRF state parameter (currently missing — guaranteed rejection without it) — Phase 8
+- [ ] **MKT-02**: All Slack permission scopes are audited and each is documented with justification — Phase 8
+- [ ] **MKT-03**: App icon meets Slack requirements (1024x1024px, unique, food/lunch themed) — Phase 8
+- [ ] **MKT-04**: App directory screenshots show the bot in action (minimum 3, 1600x1000px, 8:5 ratio) — Phase 8
+- [ ] **MKT-05**: YouTube demo video shows full install-to-uninstall flow (30-90 seconds, closed captions) — Phase 8
+- [ ] **MKT-06**: Bot is installed on 5+ active workspaces via beta rollout before submission — Phase 8
+- [ ] **MKT-07**: App is submitted to Slack App Directory and review process initiated — Phase 8
 
 ## v2 Requirements
 
@@ -129,35 +129,35 @@ Which phases cover which requirements. Updated during roadmap creation.
 | BOT-04 | Phase 3 | Complete |
 | BOT-12 | Phase 3 | Complete |
 | BOT-13 | Phase 3 | Complete |
-| BOT-05 | TBD | Pending |
-| BOT-06 | TBD | Pending |
-| BOT-07 | TBD | Pending |
-| BOT-11 | TBD | Pending |
-| BOT-08 | TBD | Pending |
-| BOT-09 | TBD | Pending |
-| BOT-10 | TBD | Pending |
-| OBS-01 | TBD | Pending |
-| OBS-02 | TBD | Pending |
-| OBS-03 | TBD | Pending |
-| OBS-04 | TBD | Pending |
-| OBS-05 | TBD | Pending |
-| OBS-06 | TBD | Pending |
-| WEB-01 | TBD | Pending |
-| WEB-02 | TBD | Pending |
-| WEB-03 | TBD | Pending |
-| MKT-01 | TBD | Pending |
-| MKT-02 | TBD | Pending |
-| MKT-03 | TBD | Pending |
-| MKT-04 | TBD | Pending |
-| MKT-05 | TBD | Pending |
-| MKT-06 | TBD | Pending |
-| MKT-07 | TBD | Pending |
+| BOT-05 | Phase 4 | Pending |
+| BOT-06 | Phase 4 | Pending |
+| BOT-07 | Phase 4 | Pending |
+| BOT-11 | Phase 4 | Pending |
+| BOT-08 | Phase 5 | Pending |
+| BOT-09 | Phase 5 | Pending |
+| BOT-10 | Phase 5 | Pending |
+| OBS-01 | Phase 6 | Pending |
+| OBS-02 | Phase 6 | Pending |
+| OBS-03 | Phase 6 | Pending |
+| OBS-04 | Phase 6 | Pending |
+| OBS-05 | Phase 6 | Pending |
+| OBS-06 | Phase 6 | Pending |
+| WEB-01 | Phase 7 | Pending |
+| WEB-02 | Phase 7 | Pending |
+| WEB-03 | Phase 7 | Pending |
+| MKT-01 | Phase 8 | Pending |
+| MKT-02 | Phase 8 | Pending |
+| MKT-03 | Phase 8 | Pending |
+| MKT-04 | Phase 8 | Pending |
+| MKT-05 | Phase 8 | Pending |
+| MKT-06 | Phase 8 | Pending |
+| MKT-07 | Phase 8 | Pending |
 
 **Coverage:**
 - v1 requirements (new this milestone): 21 total
-- Mapped to phases: 0 (pending roadmap creation)
-- Unmapped: 21 ⚠️
+- Mapped to phases: 21
+- Unmapped: 0
 
 ---
 *Requirements defined: 2026-04-05*
-*Last updated: 2026-04-06 after milestone v1.0 Marketplace Launch definition*
+*Last updated: 2026-04-06 after roadmap creation for v1.0 Marketplace Launch*

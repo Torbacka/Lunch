@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: Marketplace Launch
-status: defining_requirements
-stopped_at: Phase 03 complete — defining requirements for v1.0 Marketplace Launch
+status: ready_to_plan
+stopped_at: Roadmap created for v1.0 Marketplace Launch — 5 new phases (4-8) mapped
 last_updated: "2026-04-06T00:00:00.000Z"
-last_activity: 2026-04-06 -- Milestone v1.0 Marketplace Launch started
+last_activity: 2026-04-06 -- Roadmap created with phases 4-8 for marketplace launch
 progress:
-  total_phases: 5
+  total_phases: 8
   completed_phases: 3
-  total_plans: 11
-  completed_plans: 9
-  percent: 82
+  total_plans: 8
+  completed_plans: 8
+  percent: 37
 ---
 
 # Project State
@@ -21,14 +21,35 @@ progress:
 See: .planning/PROJECT.md (updated 2026-04-06)
 
 **Core value:** Teams can quickly and fairly decide where to eat lunch together, with smart suggestions that learn from past preferences.
-**Current focus:** Defining requirements for v1.0 Marketplace Launch
+**Current focus:** Phase 4 - Smart Recommendations (ready to plan)
 
 ## Current Position
 
-Phase: Not started (defining requirements)
-Plan: —
-Status: Defining requirements
-Last activity: 2026-04-06 — Milestone v1.0 Marketplace Launch started
+Phase: 4 of 8 (Smart Recommendations)
+Plan: 0 of 0 in current phase (not yet planned)
+Status: Ready to plan
+Last activity: 2026-04-06 — Roadmap created for v1.0 Marketplace Launch
+
+Progress: [####......] 37%
+
+## Performance Metrics
+
+**Velocity:**
+- Total plans completed: 8
+- Average duration: unknown (pre-GSD phases)
+- Total execution time: unknown
+
+**By Phase:**
+
+| Phase | Plans | Total | Avg/Plan |
+|-------|-------|-------|----------|
+| 1. Foundation | 3 | — | — |
+| 2. Multi-Tenancy | 2 | — | — |
+| 3. Core Bot Migration | 3 | — | — |
+
+**Recent Trend:**
+- Phases 1-3 completed before GSD tracking
+- Trend: N/A
 
 ## Accumulated Context
 
@@ -37,11 +58,12 @@ Last activity: 2026-04-06 — Milestone v1.0 Marketplace Launch started
 Decisions are logged in PROJECT.md Key Decisions table.
 Recent decisions affecting current work:
 
-- PostgreSQL over MongoDB for multi-tenant relational data ✓ (Phases 1-3 delivered)
-- Docker on home server for cost-effective self-hosting ✓ (blue-green deployment done)
-- Thompson sampling for smart restaurant recommendations — pending Phase 4
+- PostgreSQL over MongoDB for multi-tenant relational data (Phases 1-3 delivered)
+- Docker on home server for cost-effective self-hosting (blue-green deployment done)
+- Thompson sampling for smart restaurant recommendations — Phase 4
+- APScheduler in-process for poll scheduling — no separate container (Phase 5)
 - Launch free-only — Stripe billing deferred to post-launch milestone
-- Admin web dashboard deferred to post-launch milestone
+- structlog as only new dependency for observability — Phase 6
 
 ### Pending Todos
 
@@ -49,8 +71,10 @@ None yet.
 
 ### Blockers/Concerns
 
-- Slack App Directory review process can take days/weeks — plan buffer time
-- Beta install requirement (5+ workspaces) needs coordination before submission
+- App icon (MKT-03) has uncertain design timeline — begin early, in parallel with other phases
+- Beta tester recruitment (MKT-06, 5+ workspaces) needs coordination — begin outreach before Phase 8
+- Slack review window can be up to 10 weeks — external uptime monitoring (OBS-06) must be active before submission
+- OAuth state parameter (MKT-01) is currently missing from codebase — guaranteed rejection without it
 
 ### Quick Tasks Completed
 
@@ -62,4 +86,5 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-04-06T00:00:00.000Z
-Stopped at: Milestone v1.0 Marketplace Launch — requirements definition in progress
+Stopped at: Roadmap created for v1.0 Marketplace Launch — ready to plan Phase 4
+Resume file: None
