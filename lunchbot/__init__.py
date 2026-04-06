@@ -1,6 +1,8 @@
 import atexit
 import logging
+import uuid
 
+import structlog
 from flask import Flask
 from psycopg_pool import ConnectionPool
 
@@ -12,12 +14,47 @@ def create_app(config_name='dev'):
     from lunchbot.config import config
     app.config.from_object(config[config_name])
 
-    # Configure logging (D-11)
-    logging.basicConfig(
-        level=getattr(logging, app.config.get('LOG_LEVEL', 'INFO')),
-        format='%(asctime)s %(name)s %(levelname)s %(message)s'
+    # Configure structlog (D-01, D-04: structlog with dev/prod renderer switching)
+    shared_processors = [
+        structlog.contextvars.merge_contextvars,
+        structlog.stdlib.add_log_level,
+        structlog.stdlib.add_logger_name,
+        structlog.processors.TimeStamper(fmt="iso"),
+        structlog.processors.StackInfoRenderer(),
+        structlog.processors.format_exc_info,
+        structlog.processors.UnicodeDecoder(),
+    ]
+
+    if app.config.get('LOG_RENDERER') == 'json':
+        renderer = structlog.processors.JSONRenderer()
+    else:
+        renderer = structlog.dev.ConsoleRenderer()
+
+    structlog.configure(
+        processors=shared_processors + [
+            structlog.stdlib.ProcessorFormatter.wrap_for_formatter,
+        ],
+        logger_factory=structlog.stdlib.LoggerFactory(),
+        wrapper_class=structlog.stdlib.BoundLogger,
+        cache_logger_on_first_use=True,
     )
-    logger = logging.getLogger(__name__)
+
+    # Bridge stdlib logging through structlog (so existing logging.getLogger calls get structured)
+    formatter = structlog.stdlib.ProcessorFormatter(
+        processors=[
+            structlog.stdlib.ProcessorFormatter.remove_processors_meta,
+            renderer,
+        ],
+    )
+
+    handler = logging.StreamHandler()
+    handler.setFormatter(formatter)
+    root_logger = logging.getLogger()
+    root_logger.handlers.clear()
+    root_logger.addHandler(handler)
+    root_logger.setLevel(getattr(logging, app.config.get('LOG_LEVEL', 'INFO')))
+
+    logger = structlog.get_logger(__name__)
 
     # Initialize psycopg3 connection pool (D-05)
     pool = ConnectionPool(
@@ -29,13 +66,13 @@ def create_app(config_name='dev'):
     )
     app.extensions['pool'] = pool
     atexit.register(pool.close)
-    logger.info('Connection pool initialized')
+    logger.info('connection_pool_initialized')
 
     # Initialize APScheduler for poll scheduling (Phase 5, D-08)
     from lunchbot.services.scheduler_service import init_scheduler
     init_scheduler(app)
     atexit.register(lambda: app.extensions.get('scheduler') and app.extensions['scheduler'].running and app.extensions['scheduler'].shutdown(wait=False))
-    logger.info('Scheduler initialized')
+    logger.info('scheduler_initialized')
 
     # Register middleware (Phase 2: multi-tenancy)
     from lunchbot.middleware.signature import verify_slack_signature

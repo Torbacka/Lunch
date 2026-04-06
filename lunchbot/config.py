@@ -5,6 +5,7 @@ load_dotenv()
 
 class Config:
     SECRET_KEY = os.environ.get('SECRET_KEY', 'dev-secret-key')
+    LOG_RENDERER = 'console'
     DATABASE_URL = os.environ.get('DATABASE_URL', 'postgresql://localhost/lunchbot')
     SLACK_BOT_TOKEN = os.environ.get('SLACK_BOT_TOKEN')
     SLACK_SIGNING_SECRET = os.environ.get('SLACK_SIGNING_SECRET')
@@ -45,6 +46,7 @@ class TestConfig(Config):
 class ProdConfig(Config):
     DEBUG = False
     LOG_LEVEL = 'INFO'
+    LOG_RENDERER = 'json'
 
 config = {
     'dev': DevConfig,
