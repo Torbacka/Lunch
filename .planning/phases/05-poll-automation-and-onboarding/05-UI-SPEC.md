@@ -99,6 +99,8 @@ The App Home tab renders as a single settings panel. Two states: unconfigured (f
 
 #### State B: Configured Workspace
 
+**Visual hierarchy note:** State B is a uniform settings list — no primary focal point; all rows are equal weight by design. Each setting row uses identical block structure (section + accessory button + divider) to communicate equal importance across all configuration options.
+
 ```
 [header]      LunchBot Settings
 [divider]
@@ -155,8 +157,8 @@ All settings are edited via modals opened from App Home edit buttons. Each modal
 
 ```
 Modal title:    Poll Channel
-Submit button:  Save
-Close button:   Cancel
+Submit button:  Save Channel
+Close button:   Keep Current Channel
 
 [input]         Channel
                 type: conversations_select
@@ -171,7 +173,7 @@ Close button:   Cancel
 ```
 Modal title:    Poll Schedule
 Submit button:  Save Schedule
-Close button:   Cancel
+Close button:   Keep Current Schedule
 
 [input]         Time
                 type: timepicker
@@ -203,8 +205,8 @@ Close button:   Cancel
 
 ```
 Modal title:    Poll Options
-Submit button:  Save
-Close button:   Cancel
+Submit button:  Save Options
+Close button:   Keep Current Options
 
 [input]         Total poll options
                 type: static_select
@@ -226,8 +228,8 @@ Close button:   Cancel
 
 ```
 Modal title:    Search Location
-Submit button:  Save
-Close button:   Cancel
+Submit button:  Save Location
+Close button:   Keep Current Location
 
 [input]         Location
                 type: plain_text_input
@@ -246,7 +248,7 @@ Triggered from "Remove Schedule" danger button on App Home.
 
 ```
 Modal title:    Remove Schedule
-Submit button:  Remove (danger style text)
+Submit button:  Remove Schedule (danger style text)
 Close button:   Keep Schedule
 
 [section]       Are you sure you want to remove the automatic poll schedule?
@@ -274,8 +276,16 @@ Close button:   Keep Schedule
 | Smart picks explanation | "Smart picks use your team's voting history to suggest restaurants you're likely to enjoy. The rest are random." |
 | Location explanation | "This location is used to search for nearby restaurants via Google Places." |
 | Remove schedule confirmation | "Are you sure you want to remove the automatic poll schedule? Polls will only be triggered manually with `/lunch`." |
-| Remove schedule submit label | "Remove" |
+| Remove schedule submit label | "Remove Schedule" |
 | Remove schedule cancel label | "Keep Schedule" |
+| Channel modal submit label | "Save Channel" |
+| Channel modal close label | "Keep Current Channel" |
+| Schedule modal submit label | "Save Schedule" |
+| Schedule modal close label | "Keep Current Schedule" |
+| Poll size modal submit label | "Save Options" |
+| Poll size modal close label | "Keep Current Options" |
+| Location modal submit label | "Save Location" |
+| Location modal close label | "Keep Current Location" |
 
 ---
 
