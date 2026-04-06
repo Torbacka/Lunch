@@ -72,3 +72,13 @@ def search_and_update_emoji(location):
         if website or url:
             db_client.update_restaurant_urls(place_id, website=website, url=url)
             logger.info('Details for %s: website=%s', r.get('name', '?'), website or url)
+
+    # Tag restaurants with emoji based on cuisine type
+    json_path = os.path.join(current_app.root_path, '..', 'resources', 'food_emoji.json')
+    with open(json_path) as json_file:
+        emojis = json.load(json_file)
+
+    for emoji_entry in emojis:
+        emoji_results = search_suggestions(emoji_entry, location)
+        if emoji_results:
+            update_database(emoji_results, emoji_entry['emoji'])
