@@ -1,12 +1,17 @@
 """Tenant context middleware for multi-tenancy.
 
 Extracts workspace_id from Slack payloads and stores in flask.g.
+Binds request_id (UUID) and workspace_id to structlog context vars for
+all log calls within the request (OBS-01, OBS-02).
 """
 import json
-import logging
-from flask import g, request
+import uuid
 
-logger = logging.getLogger(__name__)
+import structlog
+from flask import g, request
+from structlog.contextvars import bind_contextvars, clear_contextvars
+
+logger = structlog.get_logger(__name__)
 
 
 def extract_workspace_id(req):
@@ -40,10 +45,23 @@ def extract_workspace_id(req):
 
 
 def set_tenant_context():
-    """Flask before_request hook. Sets g.workspace_id from Slack payload."""
+    """Flask before_request hook. Sets g.workspace_id and binds structlog context."""
+    # Clear previous request's context vars to prevent leakage
+    clear_contextvars()
+
+    # Generate unique request ID for tracing (OBS-02)
+    request_id = str(uuid.uuid4())
+    g.request_id = request_id
+
     workspace_id = extract_workspace_id(request)
     if workspace_id:
         g.workspace_id = workspace_id
-        logger.debug('Tenant context set: %s', workspace_id)
     else:
         g.workspace_id = None
+
+    # Bind context vars so ALL structlog calls in this request include these fields
+    bind_contextvars(
+        request_id=request_id,
+        workspace_id=workspace_id or 'none',
+    )
+    logger.debug('tenant_context_set', workspace_id=workspace_id)
