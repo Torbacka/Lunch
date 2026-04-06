@@ -26,7 +26,7 @@ echo "==> Active: $ACTIVE, deploying to: $INACTIVE (port $INACTIVE_PORT)"
 
 # Build fresh image
 echo "==> Building image..."
-$COMPOSE build
+$COMPOSE --profile "$INACTIVE" build "app-${INACTIVE}"
 
 # Run database migrations
 echo "==> Ensuring postgres is running..."
