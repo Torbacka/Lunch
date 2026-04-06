@@ -1,6 +1,7 @@
-"""Tests for App Home service — Block Kit builders and modal constructors."""
+"""Tests for App Home service — Block Kit builders, modal constructors, and handlers."""
 import json
 import pytest
+from unittest.mock import patch, MagicMock
 
 
 class TestBuildHomeViewStateA:
@@ -234,3 +235,191 @@ class TestBuildRemoveScheduleModal:
         assert modal['close']['text'] == 'Keep Schedule'
         blocks_text = json.dumps(modal['blocks'])
         assert 'Are you sure you want to remove the automatic poll schedule?' in blocks_text
+
+
+class TestAppHomeOpenedEvent:
+    """Test app_home_opened event handler."""
+
+    @patch('lunchbot.blueprints.events.slack_client')
+    @patch('lunchbot.blueprints.events.get_workspace_settings')
+    @patch('lunchbot.blueprints.events._is_workspace_admin')
+    def test_app_home_opened_publishes_view(self, mock_admin, mock_settings, mock_slack, app, client):
+        app.config['SLACK_SIGNING_SECRET'] = None
+        mock_admin.return_value = True
+        mock_settings.return_value = None
+        mock_slack.views_publish.return_value = {'ok': True}
+
+        response = client.post('/slack/events', json={
+            'type': 'event_callback',
+            'team_id': 'T123',
+            'event': {'type': 'app_home_opened', 'user': 'U456'},
+        })
+        assert response.status_code == 200
+        mock_slack.views_publish.assert_called_once()
+        call_args = mock_slack.views_publish.call_args
+        assert call_args[0][0] == 'U456'  # user_id
+        assert call_args[0][1]['type'] == 'home'  # view
+        assert call_args[0][2] == 'T123'  # team_id
+
+
+class TestBlockActionsEditChannel:
+    """Test App Home edit button opens channel modal."""
+
+    @patch('lunchbot.blueprints.slack_actions.slack_client')
+    @patch('lunchbot.blueprints.slack_actions.get_workspace_settings')
+    def test_edit_channel_opens_modal(self, mock_settings, mock_slack, app, client):
+        app.config['SLACK_SIGNING_SECRET'] = None
+        mock_settings.return_value = {'poll_channel': 'C_OLD'}
+        mock_slack.views_open.return_value = {'ok': True}
+
+        payload = {
+            'type': 'block_actions',
+            'team': {'id': 'T123'},
+            'user': {'id': 'U456'},
+            'trigger_id': 'trig_123',
+            'actions': [{'action_id': 'app_home_edit_channel', 'type': 'button'}],
+        }
+        response = client.post('/action', data={'payload': json.dumps(payload)})
+        assert response.status_code == 200
+        mock_slack.views_open.assert_called_once()
+        call_args = mock_slack.views_open.call_args
+        assert call_args[0][0] == 'trig_123'  # trigger_id
+        assert call_args[0][1]['callback_id'] == 'modal_channel'
+
+
+class TestViewSubmissionChannel:
+    """Test channel modal submission saves and refreshes."""
+
+    @patch('lunchbot.blueprints.slack_actions.slack_client')
+    @patch('lunchbot.blueprints.slack_actions.get_workspace_settings')
+    @patch('lunchbot.blueprints.slack_actions.update_workspace_settings')
+    def test_channel_submission_saves(self, mock_update, mock_get, mock_slack, app, client):
+        app.config['SLACK_SIGNING_SECRET'] = None
+        mock_get.return_value = {'poll_channel': 'C_NEW'}
+        mock_slack.views_publish.return_value = {'ok': True}
+
+        payload = {
+            'type': 'view_submission',
+            'user': {'id': 'U456'},
+            'view': {
+                'callback_id': 'modal_channel',
+                'private_metadata': json.dumps({'team_id': 'T123'}),
+                'state': {
+                    'values': {
+                        'channel_select_block': {
+                            'channel_select': {'selected_conversation': 'C_NEW'}
+                        }
+                    }
+                },
+            },
+        }
+        response = client.post('/action', data={'payload': json.dumps(payload)})
+        assert response.status_code == 200
+        mock_update.assert_called_once_with('T123', poll_channel='C_NEW')
+        mock_slack.views_publish.assert_called_once()
+
+
+class TestViewSubmissionPollSizeValidation:
+    """Test poll size validation: smart >= total returns error."""
+
+    def test_smart_picks_gte_total_returns_error(self, app, client):
+        app.config['SLACK_SIGNING_SECRET'] = None
+        payload = {
+            'type': 'view_submission',
+            'user': {'id': 'U456'},
+            'view': {
+                'callback_id': 'modal_poll_size',
+                'private_metadata': json.dumps({'team_id': 'T123'}),
+                'state': {
+                    'values': {
+                        'poll_total_block': {
+                            'poll_total': {'selected_option': {'value': '3'}}
+                        },
+                        'smart_count_block': {
+                            'smart_count': {'selected_option': {'value': '3'}}
+                        },
+                    }
+                },
+            },
+        }
+        response = client.post('/action', data={'payload': json.dumps(payload)})
+        assert response.status_code == 200
+        data = response.get_json()
+        assert data['response_action'] == 'errors'
+        assert 'smart_count_block' in data['errors']
+
+
+class TestViewSubmissionSchedule:
+    """Test schedule modal submission saves and syncs scheduler."""
+
+    @patch('lunchbot.blueprints.slack_actions.slack_client')
+    @patch('lunchbot.blueprints.slack_actions.update_schedule_job')
+    @patch('lunchbot.blueprints.slack_actions.get_workspace_settings')
+    @patch('lunchbot.blueprints.slack_actions.update_workspace_settings')
+    def test_schedule_submission_saves_and_syncs(self, mock_update, mock_get, mock_sched, mock_slack, app, client):
+        app.config['SLACK_SIGNING_SECRET'] = None
+        mock_get.return_value = {'poll_channel': 'C_LUNCH'}
+        mock_slack.views_publish.return_value = {'ok': True}
+
+        payload = {
+            'type': 'view_submission',
+            'user': {'id': 'U456'},
+            'view': {
+                'callback_id': 'modal_schedule',
+                'private_metadata': json.dumps({'team_id': 'T123'}),
+                'state': {
+                    'values': {
+                        'schedule_time_block': {
+                            'schedule_time': {'selected_time': '11:30'}
+                        },
+                        'schedule_tz_block': {
+                            'schedule_tz': {'selected_option': {'value': 'Europe/Stockholm'}}
+                        },
+                        'schedule_days_block': {
+                            'schedule_days': {'selected_options': [
+                                {'value': 'Mon'}, {'value': 'Wed'}, {'value': 'Fri'}
+                            ]}
+                        },
+                    }
+                },
+            },
+        }
+        response = client.post('/action', data={'payload': json.dumps(payload)})
+        assert response.status_code == 200
+        mock_update.assert_called_once()
+        mock_sched.assert_called_once()
+        sched_args = mock_sched.call_args
+        assert sched_args[0][0] == 'T123'
+        assert sched_args[1]['channel'] == 'C_LUNCH'
+
+
+class TestViewSubmissionRemoveSchedule:
+    """Test remove schedule clears DB and removes scheduler job."""
+
+    @patch('lunchbot.blueprints.slack_actions.slack_client')
+    @patch('lunchbot.blueprints.slack_actions.remove_schedule_job')
+    @patch('lunchbot.blueprints.slack_actions.get_workspace_settings')
+    @patch('lunchbot.blueprints.slack_actions.update_workspace_settings')
+    def test_remove_schedule_clears_and_removes_job(self, mock_update, mock_get, mock_remove, mock_slack, app, client):
+        app.config['SLACK_SIGNING_SECRET'] = None
+        mock_get.return_value = {'poll_channel': 'C_LUNCH'}
+        mock_slack.views_publish.return_value = {'ok': True}
+
+        payload = {
+            'type': 'view_submission',
+            'user': {'id': 'U456'},
+            'view': {
+                'callback_id': 'modal_remove_schedule',
+                'private_metadata': json.dumps({'team_id': 'T123'}),
+                'state': {'values': {}},
+            },
+        }
+        response = client.post('/action', data={'payload': json.dumps(payload)})
+        assert response.status_code == 200
+        mock_update.assert_called_once_with(
+            'T123',
+            poll_schedule_time=None,
+            poll_schedule_timezone=None,
+            poll_schedule_weekdays=None,
+        )
+        mock_remove.assert_called_once_with('T123')
