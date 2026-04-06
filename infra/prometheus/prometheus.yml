@@ -1,0 +1,17 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+scrape_configs:
+  - job_name: 'lunchbot'
+    metrics_path: '/metrics'
+    static_configs:
+      - targets:
+          - 'app-blue:5000'
+          - 'app-green:5000'
+        labels:
+          app: 'lunchbot'
+
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
