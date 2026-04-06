@@ -114,9 +114,9 @@ Plans:
 **UI hint**: yes
 
 Plans:
-- [ ] 05-01-PLAN.md -- DB migration for workspace settings columns, settings CRUD, poll_channel_for and poll_size per-workspace upgrade
-- [ ] 05-02-PLAN.md -- APScheduler initialization, per-workspace cron job management, scheduler service
-- [ ] 05-03-PLAN.md -- App Home settings panel, configuration modals, event and interaction handlers
+- [x] 05-01-PLAN.md -- DB migration for workspace settings columns, settings CRUD, poll_channel_for and poll_size per-workspace upgrade
+- [x] 05-02-PLAN.md -- APScheduler initialization, per-workspace cron job management, scheduler service
+- [x] 05-03-PLAN.md -- App Home settings panel, configuration modals, event and interaction handlers
 
 ### Phase 6: Observability
 **Goal**: Self-hosted production deployment is debuggable, self-healing, and monitored for uptime before marketplace submission
