@@ -46,9 +46,6 @@ for i in $(seq 1 15); do
     sleep 2
 done
 
-echo "==> Running database migrations..."
-$COMPOSE run --rm --no-deps "app-${INACTIVE}" alembic upgrade head
-
 # Start inactive container
 echo "==> Starting lunchbot-$INACTIVE..."
 $COMPOSE --profile "$INACTIVE" up -d "app-${INACTIVE}"
