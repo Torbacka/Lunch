@@ -55,8 +55,6 @@ def events():
     event_type = event.get('type')
     team_id = data.get('team_id')
 
-    logger.info('Received Slack event: type=%s team_id=%s', event_type, team_id)
-
     if event_type in ('app_uninstalled', 'tokens_revoked'):
         if team_id:
             deactivate_workspace(team_id)
