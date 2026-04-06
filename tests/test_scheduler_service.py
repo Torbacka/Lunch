@@ -138,8 +138,8 @@ class TestRunPoll:
         # _run_poll does deferred imports from poll_service inside app context
         with patch('lunchbot.services.poll_service.push_poll') as mock_push:
             _run_poll('T_RUN', 'C_RUN')
-            # Since channel is provided, push_poll should be called with it
-            mock_push.assert_called_once_with('C_RUN', 'T_RUN')
+            # Since channel is provided, push_poll should be called with it including trigger_source='scheduled'
+            mock_push.assert_called_once_with('C_RUN', 'T_RUN', trigger_source='scheduled')
 
     def test_resolves_channel_from_db_when_none(self, scheduler_app):
         """_run_poll calls poll_channel_for when channel arg is None."""
@@ -149,4 +149,4 @@ class TestRunPoll:
              patch('lunchbot.services.poll_service.poll_channel_for', return_value='C_RESOLVED') as mock_pcf:
             _run_poll('T_RUN2', None)
             mock_pcf.assert_called_once_with('T_RUN2')
-            mock_push.assert_called_once_with('C_RESOLVED', 'T_RUN2')
+            mock_push.assert_called_once_with('C_RESOLVED', 'T_RUN2', trigger_source='scheduled')

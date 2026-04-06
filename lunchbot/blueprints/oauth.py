@@ -4,14 +4,14 @@ Endpoints:
   GET /slack/install -- redirect to Slack authorize URL
   GET /slack/oauth_redirect -- handle OAuth callback, store token
 """
-import logging
+import structlog
 from flask import Blueprint, redirect, request, current_app
 from cryptography.fernet import Fernet
 from slack_sdk.web import WebClient
 
 from lunchbot.client.workspace_client import save_workspace
 
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger(__name__)
 
 bp = Blueprint('oauth', __name__, url_prefix='/slack')
 
@@ -53,7 +53,7 @@ def oauth_redirect():
     error = request.args.get('error')
 
     if error or not code:
-        logger.warning('OAuth error: %s', error or 'no code')
+        logger.warning('oauth_error', error=error or 'no_code')
         return _error_page(), 400
 
     try:
@@ -84,11 +84,11 @@ def oauth_redirect():
             scopes=scopes,
         )
 
-        logger.info('Workspace installed: %s (%s)', team_id, team_name)
+        logger.info('workspace_installed', team_id=team_id, team_name=team_name)
         return redirect(f'/slack/setup?team_id={team_id}')
 
     except Exception:
-        logger.exception('OAuth token exchange failed')
+        logger.exception('oauth_token_exchange_failed')
         return _error_page(), 500
 
 

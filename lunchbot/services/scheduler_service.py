@@ -6,11 +6,11 @@ Per D-08: initialized in create_app alongside connection pool.
 
 Job naming: "poll_{team_id}" per workspace.
 """
-import logging
+import structlog
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.cron import CronTrigger
 
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger(__name__)
 
 # Module-level scheduler reference (set by init_scheduler)
 _scheduler = None
@@ -38,9 +38,9 @@ def init_scheduler(app):
         with app.app_context():
             load_all_schedules()
         _scheduler.start()
-        logger.info('Scheduler started')
+        logger.info('scheduler_started')
     else:
-        logger.info('Scheduler created (not started -- testing mode)')
+        logger.info('scheduler_created_testing')
 
 
 def load_all_schedules():
@@ -73,7 +73,7 @@ def load_all_schedules():
             weekdays=row.get('poll_schedule_weekdays') or ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'],
         )
         count += 1
-    logger.info('Loaded %d scheduled poll jobs from database', count)
+    logger.info('schedules_loaded', count=count)
 
 
 def update_schedule_job(team_id, time_val, timezone, weekdays, channel=None):
@@ -99,8 +99,7 @@ def update_schedule_job(team_id, time_val, timezone, weekdays, channel=None):
         timezone=timezone,
         weekdays=weekdays,
     )
-    logger.info('Updated schedule job %s: %s:%s %s %s',
-                job_id, time_val.hour, time_val.minute, timezone, weekdays)
+    logger.info('schedule_updated', job_id=job_id, hour=time_val.hour, minute=time_val.minute, timezone=timezone, weekdays=weekdays)
 
 
 def remove_schedule_job(team_id):
@@ -108,9 +107,9 @@ def remove_schedule_job(team_id):
     job_id = f'poll_{team_id}'
     if _scheduler and _scheduler.get_job(job_id):
         _scheduler.remove_job(job_id)
-        logger.info('Removed schedule job %s', job_id)
+        logger.info('schedule_removed', job_id=job_id)
     else:
-        logger.debug('No schedule job to remove for %s', job_id)
+        logger.debug('schedule_remove_noop', job_id=job_id)
 
 
 def _add_job(team_id, channel, hour, minute, timezone, weekdays):
@@ -142,7 +141,7 @@ def _run_poll(team_id, channel):
     not from external input at execution time.
     """
     if _app is None:
-        logger.error('Scheduler app reference is None, cannot run poll')
+        logger.error('scheduler_app_none')
         return
     with _app.app_context():
         from flask import g
@@ -150,11 +149,10 @@ def _run_poll(team_id, channel):
         g.workspace_id = team_id
         resolved_channel = channel or poll_channel_for(team_id)
         if not resolved_channel:
-            logger.warning('No poll channel configured for workspace %s, skipping', team_id)
+            logger.warning('poll_channel_missing', team_id=team_id)
             return
         try:
-            push_poll(resolved_channel, team_id)
-            logger.info('Scheduled poll posted for workspace %s in channel %s',
-                        team_id, resolved_channel)
+            push_poll(resolved_channel, team_id, trigger_source='scheduled')
+            logger.info('scheduled_poll_posted', team_id=team_id, channel=resolved_channel)
         except Exception:
-            logger.exception('Failed to post scheduled poll for workspace %s', team_id)
+            logger.exception('scheduled_poll_failed', team_id=team_id)
