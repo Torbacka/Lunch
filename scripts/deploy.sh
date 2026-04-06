@@ -4,7 +4,7 @@ set -euo pipefail
 DEPLOY_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 STATE_FILE="/opt/lunchbot/active_color"
 UPSTREAM_CONF="/etc/nginx/conf.d/lunchbot-upstream.conf"
-COMPOSE="docker compose -f ${DEPLOY_DIR}/docker-compose.yml"
+COMPOSE="docker compose -f ${DEPLOY_DIR}/docker-compose.yml --env-file /opt/lunchbot/.env"
 
 # Read current active color (default blue)
 if [[ -f "$STATE_FILE" ]]; then
