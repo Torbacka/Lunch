@@ -7,6 +7,7 @@ on:
       - lunchbot/**
       - migrations/**
       - tests/**
+      - resources/**
       - Dockerfile
       - docker-compose.yml
       - requirements.txt
@@ -16,9 +17,53 @@ on:
   workflow_dispatch:
 
 jobs:
+  test:
+    name: Run Tests
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: lunchbot_test
+          POSTGRES_USER: lunchbot
+          POSTGRES_PASSWORD: testpass
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U lunchbot -d lunchbot_test"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 5
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run migrations on test database
+        run: alembic upgrade head
+        env:
+          DATABASE_URL: postgresql://lunchbot:testpass@localhost:5432/lunchbot_test
+
+      - name: Run tests
+        run: pytest tests/ -v
+        env:
+          TEST_DATABASE_URL: postgresql://lunchbot:testpass@localhost:5432/lunchbot_test
+          DATABASE_URL: postgresql://lunchbot:testpass@localhost:5432/lunchbot_test
+
   deploy:
     name: Deploy to Home Server
     runs-on: self-hosted
+    needs: test
 
     steps:
       - name: Checkout code

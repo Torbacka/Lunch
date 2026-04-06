@@ -17,15 +17,15 @@ class TestPlacesClient:
             mock_session.get.return_value = mock_response
 
             from lunchbot.client.places_client import find_suggestion
-            result = find_suggestion('pizza')
+            result = find_suggestion('pizza', '59.3419,18.0645')
 
             mock_session.get.assert_called_once()
             call_args = mock_session.get.call_args
             assert 'nearbysearch/json' in call_args[0][0]
             params = call_args[1]['params']
             assert params['keyword'] == 'pizza'
-            assert params['location'] == '59.3419128,18.0644956'
-            assert params['radius'] == 600
+            assert params['location'] == '59.3419,18.0645'
+            assert params['radius'] == 700
             assert params['type'] == 'restaurant'
             assert params['key'] == 'test-api-key'
             assert result == {'results': []}
