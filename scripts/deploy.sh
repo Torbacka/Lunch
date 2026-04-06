@@ -28,6 +28,27 @@ echo "==> Active: $ACTIVE, deploying to: $INACTIVE (port $INACTIVE_PORT)"
 echo "==> Building image..."
 $COMPOSE build
 
+# Run database migrations
+echo "==> Ensuring postgres is running..."
+$COMPOSE up -d postgres
+
+echo "==> Waiting for postgres to be healthy..."
+for i in $(seq 1 15); do
+    if $COMPOSE exec postgres pg_isready -U lunchbot -d lunchbot >/dev/null 2>&1; then
+        echo "==> Postgres is ready!"
+        break
+    fi
+    if [[ $i -eq 15 ]]; then
+        echo "==> Postgres failed to start — aborting deploy"
+        exit 1
+    fi
+    echo "    Attempt $i/15 — waiting 2s..."
+    sleep 2
+done
+
+echo "==> Running database migrations..."
+$COMPOSE run --rm --no-deps "app-${INACTIVE}" alembic upgrade head
+
 # Start inactive container
 echo "==> Starting lunchbot-$INACTIVE..."
 $COMPOSE --profile "$INACTIVE" up -d "app-${INACTIVE}"

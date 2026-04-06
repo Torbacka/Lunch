@@ -44,7 +44,7 @@ class TestConfig(Config):
 
 class ProdConfig(Config):
     DEBUG = False
-    LOG_LEVEL = 'WARNING'
+    LOG_LEVEL = 'INFO'
 
 config = {
     'dev': DevConfig,
