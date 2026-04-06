@@ -205,6 +205,7 @@ def add_emoji(place_ids, emoji_string):
                 UPDATE restaurants
                 SET emoji = %(emoji)s, updated_at = NOW()
                 WHERE place_id = ANY(%(place_ids)s)
+                  AND (emoji IS NULL OR emoji = '')
             """, {'emoji': emoji_string, 'place_ids': place_ids})
             logger.info('Updated emoji to %s for %d restaurants', emoji_string, cur.rowcount)
             return cur.rowcount

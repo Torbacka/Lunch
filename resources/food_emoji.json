@@ -1,19 +1,7 @@
 [
   {
-    "emoji": "hamburger",
-    "search_query": ["hamburger"]
-  },
-  {
-    "emoji": "pizza",
-    "search_query": ["pizza"]
-  },
-  {
-    "emoji": "hot_dog",
-    "search_query": ["hot dog"]
-  },
-  {
-    "emoji": "sandwich",
-    "search_query": ["sandwich"]
+    "emoji": "sushi",
+    "search_query": ["sushi"]
   },
   {
     "emoji": "taco",
@@ -24,36 +12,12 @@
     "search_query": ["burrito"]
   },
   {
-    "emoji": "stuffed_flatbread",
-    "search_query": ["kebab"]
-  },
-  {
-    "emoji": "bowl_with_spoon",
-    "search_query": ["soup"]
-  },
-  {
-    "emoji": "green_salad",
-    "search_query": ["healthy", "salad"]
-  },
-  {
-    "emoji": "bento_box",
-    "search_query": ["japanese"]
-  },
-  {
-    "emoji": "rice_ball",
-    "search_query": ["rice"]
-  },
-  {
     "emoji": "curry_rice",
     "search_query": ["indian", "curry"]
   },
   {
-    "emoji": "spaghetti",
-    "search_query": ["spaghetti", "italian", "french"]
-  },
-  {
-    "emoji": "sushi",
-    "search_query": ["sushi"]
+    "emoji": "bento_box",
+    "search_query": ["japanese"]
   },
   {
     "emoji": "dumpling",
@@ -64,7 +28,43 @@
     "search_query": ["thai", "chinese", "korean"]
   },
   {
-    "emoji": "pie",
-    "search_query": ["pie"]
+    "emoji": "stuffed_flatbread",
+    "search_query": ["kebab"]
+  },
+  {
+    "emoji": "hot_dog",
+    "search_query": ["hot dog"]
+  },
+  {
+    "emoji": "hamburger",
+    "search_query": ["hamburger", "burger"]
+  },
+  {
+    "emoji": "pizza",
+    "search_query": ["pizza"]
+  },
+  {
+    "emoji": "spaghetti",
+    "search_query": ["spaghetti", "italian", "pasta"]
+  },
+  {
+    "emoji": "green_salad",
+    "search_query": ["salad", "healthy"]
+  },
+  {
+    "emoji": "sandwich",
+    "search_query": ["sandwich"]
+  },
+  {
+    "emoji": "bowl_with_spoon",
+    "search_query": ["soup"]
+  },
+  {
+    "emoji": "rice_ball",
+    "search_query": ["rice"]
+  },
+  {
+    "emoji": "fork_and_knife",
+    "search_query": ["restaurant", "bistro", "bar"]
   }
 ]
