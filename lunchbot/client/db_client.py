@@ -253,7 +253,8 @@ def get_candidate_pool(poll_date):
                COALESCE(rs.times_shown, 0) AS times_shown
         FROM restaurants r
         LEFT JOIN restaurant_stats rs ON rs.restaurant_id = r.id
-        WHERE r.id NOT IN (
+        WHERE r.rating IS NOT NULL
+          AND r.id NOT IN (
             SELECT po.restaurant_id
             FROM poll_options po
             JOIN polls p ON p.id = po.poll_id
