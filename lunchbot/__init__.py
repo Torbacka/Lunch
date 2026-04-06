@@ -31,6 +31,12 @@ def create_app(config_name='dev'):
     atexit.register(pool.close)
     logger.info('Connection pool initialized')
 
+    # Initialize APScheduler for poll scheduling (Phase 5, D-08)
+    from lunchbot.services.scheduler_service import init_scheduler
+    init_scheduler(app)
+    atexit.register(lambda: app.extensions.get('scheduler') and app.extensions['scheduler'].running and app.extensions['scheduler'].shutdown(wait=False))
+    logger.info('Scheduler initialized')
+
     # Register middleware (Phase 2: multi-tenancy)
     from lunchbot.middleware.signature import verify_slack_signature
     from lunchbot.middleware.tenant import set_tenant_context
