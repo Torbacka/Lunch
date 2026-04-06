@@ -27,7 +27,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 </details>
 
 - [ ] **Phase 4: Smart Recommendations** - Thompson sampling, configurable smart/random ratio, reputation tracking
-- [ ] **Phase 5: Poll Automation and Onboarding** - Auto-close, scheduled polls, App Home onboarding
+- [ ] **Phase 5: Poll Automation and Onboarding** - Scheduled polls, App Home onboarding (auto-close descoped per D-01)
 - [ ] **Phase 6: Observability** - Structured logging, request tracing, container health, uptime monitoring
 - [ ] **Phase 7: Web Presence** - Landing page, privacy policy, support page served from Flask
 - [ ] **Phase 8: Marketplace Submission** - OAuth hardening, scope audit, assets, beta rollout, directory submission
@@ -103,19 +103,20 @@ Plans:
 - [ ] 04-02: TBD
 
 ### Phase 5: Poll Automation and Onboarding
-**Goal**: Polls run on autopilot with scheduled triggers and auto-close, and new workspaces get a guided setup experience
+**Goal**: Polls run on autopilot with scheduled triggers, and new workspaces get a guided setup experience via App Home (BOT-08 auto-close descoped per D-01)
 **Depends on**: Phase 4
 **Requirements**: BOT-08, BOT-09, BOT-10
 **Success Criteria** (what must be TRUE):
-  1. Active poll auto-closes after a configurable duration and posts a winner summary to the channel
+  1. ~~Active poll auto-closes after a configurable duration and posts a winner summary to the channel~~ (descoped per D-01 — polls are open-ended, decisions happen IRL)
   2. Admin can configure a recurring poll schedule (time, timezone, weekdays) and polls trigger automatically at the scheduled time
   3. New workspace installations see an App Home tab with an onboarding flow that guides initial setup (poll channel, schedule, restaurant sources)
-**Plans**: TBD
+**Plans**: 3 plans
 **UI hint**: yes
 
 Plans:
-- [ ] 05-01: TBD
-- [ ] 05-02: TBD
+- [ ] 05-01-PLAN.md -- DB migration for workspace settings columns, settings CRUD, poll_channel_for and poll_size per-workspace upgrade
+- [ ] 05-02-PLAN.md -- APScheduler initialization, per-workspace cron job management, scheduler service
+- [ ] 05-03-PLAN.md -- App Home settings panel, configuration modals, event and interaction handlers
 
 ### Phase 6: Observability
 **Goal**: Self-hosted production deployment is debuggable, self-healing, and monitored for uptime before marketplace submission
@@ -175,7 +176,7 @@ Note: Phase 6 (Observability) depends on Phase 3, not Phase 5. It could theoreti
 | 2. Multi-Tenancy | 2/2 | Complete | 2026-04-01 |
 | 3. Core Bot Migration | 3/3 | Complete | 2026-04-04 |
 | 4. Smart Recommendations | 0/0 | Not started | - |
-| 5. Poll Automation and Onboarding | 0/0 | Not started | - |
+| 5. Poll Automation and Onboarding | 0/3 | Planned | - |
 | 6. Observability | 0/0 | Not started | - |
 | 7. Web Presence | 0/0 | Not started | - |
 | 8. Marketplace Submission | 0/0 | Not started | - |
