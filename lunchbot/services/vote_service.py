@@ -33,7 +33,8 @@ def get_voter_image(user_id, team_id):
         'url': profile.get('image_24', ''),
         'name': profile.get('display_name') or profile.get('real_name', ''),
     }
-    profile_cache[user_id] = result
+    if result['url']:
+        profile_cache[user_id] = result
     return result
 
 
