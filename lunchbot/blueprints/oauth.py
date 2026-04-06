@@ -85,7 +85,7 @@ def oauth_redirect():
         )
 
         logger.info('Workspace installed: %s (%s)', team_id, team_name)
-        return _success_page()
+        return redirect(f'/slack/setup?team_id={team_id}')
 
     except Exception:
         logger.exception('OAuth token exchange failed')

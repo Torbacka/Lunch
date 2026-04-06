@@ -74,9 +74,17 @@ def suggestion_message():
 
 @bp.route('/emoji', methods=['GET'])
 def emoji():
-    """Update emoji tags on restaurants.
-    Phase 3 wires to emoji.search_and_update_emoji().
+    """Update emoji tags on restaurants for a workspace.
+
+    Requires team_id query param to resolve workspace location.
     """
-    logger.info('Emoji update triggered')
-    emoji_service.search_and_update_emoji()
+    from lunchbot.client.workspace_client import get_workspace
+    team_id = request.args.get('team_id', '')
+    workspace = get_workspace(team_id) if team_id else None
+    location = workspace.get('location') if workspace else None
+    if not location:
+        logger.warning('Emoji update skipped: no location for team_id=%s', team_id)
+        return 'No location configured for workspace', 400
+    logger.info('Emoji update triggered for team_id=%s', team_id)
+    emoji_service.search_and_update_emoji(location)
     return '', 200

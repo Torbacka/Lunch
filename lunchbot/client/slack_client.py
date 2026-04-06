@@ -70,8 +70,12 @@ def post_message(channel, blocks, team_id, text=''):
         headers=_headers(token),
         json={'channel': channel, 'blocks': blocks, 'text': text}
     )
-    logger.info('Status code: %s response: %s', response.status_code, response.json().get('ok'))
-    return response.json()
+    resp_json = response.json()
+    if not resp_json.get('ok'):
+        logger.error('chat.postMessage failed: %s', resp_json.get('error'))
+    else:
+        logger.info('Status code: %s response: %s', response.status_code, resp_json.get('ok'))
+    return resp_json
 
 
 def update_message(channel, ts, blocks, team_id):

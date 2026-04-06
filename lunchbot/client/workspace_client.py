@@ -52,6 +52,17 @@ def get_workspace(team_id):
             return cur.fetchone()
 
 
+def update_workspace_location(team_id, location):
+    """Save lat,lng location string for a workspace (e.g. '59.3419,18.0645')."""
+    with get_pool().connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""
+                UPDATE workspaces SET location = %(location)s, updated_at = NOW()
+                WHERE team_id = %(team_id)s
+            """, {'team_id': team_id, 'location': location})
+            logger.info('Updated location for workspace: %s', team_id)
+
+
 def deactivate_workspace(team_id):
     """Soft-delete workspace on uninstall. Idempotent.
     Sets is_active=False and uninstalled_at=NOW().

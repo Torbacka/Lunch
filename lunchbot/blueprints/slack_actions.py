@@ -6,9 +6,10 @@ import json
 import logging
 from datetime import date
 
-from flask import Blueprint, request, jsonify
+from flask import Blueprint, request, jsonify, g
 
 from lunchbot.client import places_client, db_client
+from lunchbot.client.workspace_client import get_workspace
 from lunchbot.services import vote_service
 
 logger = logging.getLogger(__name__)
@@ -73,7 +74,12 @@ def find_suggestions():
     search_value = payload.get('value', '')
     logger.info('Received suggestion search: %s', search_value)
 
-    response = places_client.find_suggestion(search_value)
+    workspace = get_workspace(g.workspace_id)
+    location = workspace.get('location') if workspace else None
+    if not location:
+        return jsonify({'options': []})
+
+    response = places_client.find_suggestion(search_value, location)
     db_client.save_restaurants(response)
 
     options = []

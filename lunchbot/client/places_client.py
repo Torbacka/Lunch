@@ -14,14 +14,18 @@ session = requests.Session()
 PLACES_BASE = "https://maps.googleapis.com/maps/api/place/"
 
 
-def find_suggestion(search_string):
+def find_suggestion(search_string, location):
     """Search for nearby restaurants matching search_string.
+
+    Args:
+        search_string: keyword to search for (e.g. 'pizza')
+        location: 'lat,lng' string for the search center (e.g. '59.3419,18.0645')
 
     Returns full Google Places API JSON response dict with 'results' list.
     """
     key = current_app.config['GOOGLE_PLACES_API_KEY']
     params = {
-        'location': '59.3419128,18.0644956',
+        'location': location,
         'radius': 600,
         'keyword': search_string,
         'type': 'restaurant',

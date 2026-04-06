@@ -43,10 +43,12 @@ def create_app(config_name='dev'):
     from lunchbot.blueprints.polls import bp as polls_bp
     from lunchbot.blueprints.oauth import bp as oauth_bp
     from lunchbot.blueprints.events import bp as events_bp
+    from lunchbot.blueprints.setup import bp as setup_bp
     app.register_blueprint(health_bp)
     app.register_blueprint(slack_bp)
     app.register_blueprint(polls_bp)
     app.register_blueprint(oauth_bp)
     app.register_blueprint(events_bp)
+    app.register_blueprint(setup_bp)
 
     return app
