@@ -10,7 +10,7 @@ Endpoints:
 import logging
 import threading
 
-from flask import Blueprint, request, current_app
+from flask import Blueprint, request, current_app, g
 
 from lunchbot.client.workspace_client import get_workspace, update_workspace_location
 from lunchbot.services import emoji_service
@@ -23,6 +23,7 @@ bp = Blueprint('setup', __name__, url_prefix='/slack')
 def _seed_restaurants(app, team_id, location):
     """Run restaurant seeding inside a pushed app context."""
     with app.app_context():
+        g.workspace_id = team_id
         logger.info('Background seed started for team_id=%s location=%s', team_id, location)
         try:
             emoji_service.search_and_update_emoji(location)

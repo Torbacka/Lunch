@@ -9,6 +9,8 @@ import os
 
 from flask import current_app
 
+from flask import g
+
 from lunchbot.client import places_client, db_client
 
 logger = logging.getLogger(__name__)
@@ -54,4 +56,5 @@ def search_and_update_emoji(location):
     for emoji_entry in emojis:
         results = search_suggestions(emoji_entry, location)
         if results:
+            db_client.save_restaurants({'results': results})
             update_database(results, emoji_entry['emoji'])
