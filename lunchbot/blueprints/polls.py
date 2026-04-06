@@ -1,7 +1,7 @@
 """Poll management endpoints.
 
 Handles: /slack/command (slash command), /lunch_message (scheduler trigger),
-         /suggestion_message (send suggestion), /emoji (update emoji tags).
+         /suggestion_message (send suggestion), /seed (seed restaurants).
 """
 import logging
 
@@ -72,19 +72,20 @@ def suggestion_message():
     return '', 200
 
 
-@bp.route('/emoji', methods=['GET'])
-def emoji():
-    """Update emoji tags on restaurants for a workspace.
+@bp.route('/seed', methods=['GET'])
+def seed():
+    """Seed restaurants and update emoji tags for a workspace.
 
     Requires team_id query param to resolve workspace location.
+    Searches Google Places for nearby restaurants and assigns emoji categories.
     """
     from lunchbot.client.workspace_client import get_workspace
     team_id = request.args.get('team_id', '')
     workspace = get_workspace(team_id) if team_id else None
     location = workspace.get('location') if workspace else None
     if not location:
-        logger.warning('Emoji update skipped: no location for team_id=%s', team_id)
+        logger.warning('Seed skipped: no location for team_id=%s', team_id)
         return 'No location configured for workspace', 400
-    logger.info('Emoji update triggered for team_id=%s', team_id)
+    logger.info('Restaurant seed triggered for team_id=%s', team_id)
     emoji_service.search_and_update_emoji(location)
     return '', 200

@@ -36,7 +36,7 @@ def test_health_check_returns_200(client):
 def test_routes_registered(app):
     """All expected routes are registered in the app."""
     rules = [r.rule for r in app.url_map.iter_rules()]
-    expected = ['/health', '/action', '/find_suggestions', '/lunch_message', '/suggestion_message', '/emoji']
+    expected = ['/health', '/action', '/find_suggestions', '/lunch_message', '/suggestion_message', '/seed']
     for route in expected:
         assert route in rules, f"Route {route} not registered"
 

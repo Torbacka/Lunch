@@ -79,16 +79,16 @@ class TestEmojiService:
             assert 'ChIJ_curry1' in place_ids
 
 
-class TestEmojiEndpoint:
-    """Tests for GET /emoji endpoint."""
+class TestSeedEndpoint:
+    """Tests for GET /seed endpoint."""
 
     @patch('lunchbot.blueprints.polls.emoji_service')
-    def test_emoji_endpoint_returns_200(self, mock_emoji, app, client):
-        """GET /emoji calls search_and_update_emoji and returns 200."""
+    def test_seed_endpoint_returns_200(self, mock_emoji, app, client):
+        """GET /seed calls search_and_update_emoji and returns 200."""
         app.config['SLACK_SIGNING_SECRET'] = None
         mock_emoji.search_and_update_emoji.return_value = None
 
-        response = client.get('/emoji')
+        response = client.get('/seed')
 
         assert response.status_code == 200
         mock_emoji.search_and_update_emoji.assert_called_once()

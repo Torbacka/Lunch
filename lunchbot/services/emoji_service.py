@@ -25,7 +25,11 @@ def search_suggestions(emoji_entry, location):
     for search in emoji_entry['search_query']:
         logger.info('Searching for %s in nearby searches', search)
         response = places_client.find_suggestion(search, location)
-        results.extend(response.get('results', []))
+        found = response.get('results', [])
+        logger.info('Found %d restaurants for query "%s"', len(found), search)
+        for r in found:
+            logger.debug('  -> %s (place_id=%s)', r.get('name', '?'), r.get('place_id', '?'))
+        results.extend(found)
     return results
 
 
@@ -53,8 +57,16 @@ def search_and_update_emoji(location):
     with open(json_path) as json_file:
         emojis = json.load(json_file)
 
+    total_saved = 0
     for emoji_entry in emojis:
+        logger.info('Seeding category: :%s: (%s)',
+                     emoji_entry['emoji'],
+                     ', '.join(emoji_entry['search_query']))
         results = search_suggestions(emoji_entry, location)
         if results:
             db_client.save_restaurants({'results': results})
             update_database(results, emoji_entry['emoji'])
+            total_saved += len(results)
+        else:
+            logger.warning('No restaurants found for category :%s:', emoji_entry['emoji'])
+    logger.info('Seeding complete: %d total restaurant results processed', total_saved)
