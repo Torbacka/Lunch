@@ -45,28 +45,19 @@ def update_database(results, emoji_string):
 
 
 def search_and_update_emoji(location):
-    """Load food_emoji.json and update emoji tags for all restaurants.
+    """Seed the restaurant database from Google Places.
 
-    For each emoji category, searches Google Places for matching restaurants
-    near the given location and updates their emoji field in PostgreSQL.
+    Fetches all restaurants within 700m of location, saves them, then
+    applies emoji tags by matching against food_emoji.json search terms.
 
     Args:
         location: 'lat,lng' string (e.g. '59.3419,18.0645')
     """
-    json_path = os.path.join(current_app.root_path, '..', 'resources', 'food_emoji.json')
-    with open(json_path) as json_file:
-        emojis = json.load(json_file)
+    response = places_client.find_restaurants_nearby(location)
+    results = response.get('results', [])
+    if not results:
+        logger.warning('No restaurants found near %s', location)
+        return
 
-    total_saved = 0
-    for emoji_entry in emojis:
-        logger.info('Seeding category: :%s: (%s)',
-                     emoji_entry['emoji'],
-                     ', '.join(emoji_entry['search_query']))
-        results = search_suggestions(emoji_entry, location)
-        if results:
-            db_client.save_restaurants({'results': results})
-            update_database(results, emoji_entry['emoji'])
-            total_saved += len(results)
-        else:
-            logger.warning('No restaurants found for category :%s:', emoji_entry['emoji'])
-    logger.info('Seeding complete: %d total restaurant results processed', total_saved)
+    db_client.save_restaurants({'results': results})
+    logger.info('Saved %d restaurants near %s', len(results), location)

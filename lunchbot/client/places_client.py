@@ -26,8 +26,31 @@ def find_suggestion(search_string, location):
     key = current_app.config['GOOGLE_PLACES_API_KEY']
     params = {
         'location': location,
-        'radius': 600,
+        'radius': 700,
         'keyword': search_string,
+        'type': 'restaurant',
+        'key': key,
+    }
+    response = session.get(PLACES_BASE + 'nearbysearch/json', params=params)
+    return response.json()
+
+
+def find_restaurants_nearby(location, radius=700):
+    """Fetch all restaurants within radius metres of location.
+
+    No keyword filter — returns everything Google Places classifies as a
+    restaurant. Used for initial workspace seeding.
+
+    Args:
+        location: 'lat,lng' string (e.g. '59.3419,18.0645')
+        radius: search radius in metres (default 700)
+
+    Returns full Google Places API JSON response dict with 'results' list.
+    """
+    key = current_app.config['GOOGLE_PLACES_API_KEY']
+    params = {
+        'location': location,
+        'radius': radius,
         'type': 'restaurant',
         'key': key,
     }

@@ -43,17 +43,19 @@ def setup_form():
 def setup_submit():
     """Save workspace location and trigger background restaurant seeding."""
     team_id = request.form.get('team_id', '').strip()
-    lat = request.form.get('lat', '').strip()
-    lng = request.form.get('lng', '').strip()
+    coords = request.form.get('coords', '').strip()
 
-    if not team_id or not lat or not lng:
-        return _form_page(team_id, error='All fields are required.'), 400
+    if not team_id or not coords:
+        return _form_page(team_id, error='Coordinates are required.'), 400
+
+    parts = [p.strip() for p in coords.split(',')]
+    if len(parts) != 2:
+        return _form_page(team_id, error='Enter coordinates as "lat, lng" (e.g. 59.3419, 18.0645).'), 400
 
     try:
-        float(lat)
-        float(lng)
+        lat, lng = float(parts[0]), float(parts[1])
     except ValueError:
-        return _form_page(team_id, error='Latitude and longitude must be numbers.'), 400
+        return _form_page(team_id, error='Could not parse coordinates. Copy them directly from Google Maps.'), 400
 
     workspace = get_workspace(team_id)
     if not workspace:
@@ -102,10 +104,9 @@ button:hover {{ background: #3b1040; }}
 {error_html}
 <form method="POST" action="/slack/setup">
   <input type="hidden" name="team_id" value="{team_id}">
-  <label for="lat">Latitude</label>
-  <input type="text" id="lat" name="lat" placeholder="59.3419128" required>
-  <label for="lng">Longitude</label>
-  <input type="text" id="lng" name="lng" placeholder="18.0644956" required>
+  <label for="coords">Office coordinates</label>
+  <input type="text" id="coords" name="coords" placeholder="59.3419128, 18.0644956" required>
+  <p class="hint">Right-click your office in <a href="https://maps.google.com" target="_blank">Google Maps</a> and select the coordinates to copy them.</p>
   <button type="submit">Save &amp; find restaurants</button>
 </form>
 </div>
