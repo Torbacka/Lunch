@@ -18,6 +18,12 @@ bp = Blueprint('oauth', __name__, url_prefix='/slack')
 SCOPES = 'commands,chat:write,users:read'
 
 
+def _redirect_uri():
+    """Build the OAuth redirect URI, respecting X-Forwarded-Proto from reverse proxy."""
+    scheme = request.headers.get('X-Forwarded-Proto', request.scheme)
+    return f'{scheme}://{request.host}/slack/oauth_redirect'
+
+
 def encrypt_token(token, fernet_key):
     """Encrypt a bot token using Fernet symmetric encryption."""
     f = Fernet(fernet_key.encode() if isinstance(fernet_key, str) else fernet_key)
@@ -34,8 +40,9 @@ def decrypt_token(encrypted_token, fernet_key):
 def install():
     """Redirect to Slack OAuth V2 authorize URL."""
     client_id = current_app.config['SLACK_CLIENT_ID']
+    redirect_uri = _redirect_uri()
     return redirect(
-        f'https://slack.com/oauth/v2/authorize?client_id={client_id}&scope={SCOPES}'
+        f'https://slack.com/oauth/v2/authorize?client_id={client_id}&scope={SCOPES}&redirect_uri={redirect_uri}'
     )
 
 
@@ -50,11 +57,13 @@ def oauth_redirect():
         return _error_page(), 400
 
     try:
+        redirect_uri = _redirect_uri()
         client = WebClient()
         response = client.oauth_v2_access(
             client_id=current_app.config['SLACK_CLIENT_ID'],
             client_secret=current_app.config['SLACK_CLIENT_SECRET'],
             code=code,
+            redirect_uri=redirect_uri,
         )
 
         team_id = response['team']['id']
