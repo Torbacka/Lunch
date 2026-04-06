@@ -135,16 +135,8 @@ class TestRunPoll:
         """_run_poll calls push_poll with the correct channel and team_id inside app context."""
         from lunchbot.services.scheduler_service import _run_poll
 
-        with patch('lunchbot.services.scheduler_service.poll_channel_for') as mock_pcf, \
-             patch('lunchbot.services.scheduler_service.push_poll') as mock_push:
-            # _run_poll imports push_poll and poll_channel_for inside app context
-            # so we need to patch at the point of use
-            pass
-
-        # _run_poll uses deferred imports inside with _app.app_context()
-        # We need to patch the imported names in poll_service
-        with patch('lunchbot.services.poll_service.push_poll') as mock_push, \
-             patch('lunchbot.services.poll_service.poll_channel_for') as mock_pcf:
+        # _run_poll does deferred imports from poll_service inside app context
+        with patch('lunchbot.services.poll_service.push_poll') as mock_push:
             _run_poll('T_RUN', 'C_RUN')
             # Since channel is provided, push_poll should be called with it
             mock_push.assert_called_once_with('C_RUN', 'T_RUN')
