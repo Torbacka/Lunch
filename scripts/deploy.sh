@@ -68,7 +68,7 @@ for i in $(seq 1 10); do
     sleep 3
 done
 
-# Ensure site config is installed (idempotent)
+# Ensure site configs are installed (idempotent)
 SITE_CONF="/etc/nginx/sites-available/lunch.torbacka.se"
 if [[ ! -f "$SITE_CONF" ]]; then
     echo "==> Installing nginx site config..."
@@ -77,6 +77,19 @@ if [[ ! -f "$SITE_CONF" ]]; then
 else
     sudo cp "${DEPLOY_DIR}/nginx/lunch.torbacka.se.conf" "$SITE_CONF"
 fi
+
+GRAFANA_CONF="/etc/nginx/sites-available/grafana.torbacka.se"
+if [[ ! -f "$GRAFANA_CONF" ]]; then
+    echo "==> Installing Grafana nginx site config..."
+    sudo cp "${DEPLOY_DIR}/nginx/grafana.torbacka.se.conf" "$GRAFANA_CONF"
+    sudo ln -sf "$GRAFANA_CONF" /etc/nginx/sites-enabled/grafana.torbacka.se
+else
+    sudo cp "${DEPLOY_DIR}/nginx/grafana.torbacka.se.conf" "$GRAFANA_CONF"
+fi
+
+# Ensure monitoring stack is running
+echo "==> Starting prometheus and grafana..."
+$COMPOSE up -d prometheus grafana
 
 # Switch nginx upstream and reload server nginx
 echo "==> Switching nginx upstream to $INACTIVE..."
