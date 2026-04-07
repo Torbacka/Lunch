@@ -130,10 +130,10 @@ Plans:
 **Plans**: 4 plans
 
 Plans:
-- [ ] 06-01-PLAN.md -- Structured logging foundation (structlog init, request context binding, stdlib bridge)
-- [ ] 06-02-PLAN.md -- Service-layer logging (poll_service, slack_actions, scheduler_service, oauth events)
-- [ ] 06-03-PLAN.md -- Health endpoint enhancement, Docker HEALTHCHECK, log rotation
-- [ ] 06-04-PLAN.md -- Prometheus + Grafana metrics stack, custom metrics, uptime alerting via Resend SMTP
+- [x] 06-01-PLAN.md -- Structured logging foundation (structlog init, request context binding, stdlib bridge)
+- [x] 06-02-PLAN.md -- Service-layer logging (poll_service, slack_actions, scheduler_service, oauth events)
+- [x] 06-03-PLAN.md -- Health endpoint enhancement, Docker HEALTHCHECK, log rotation
+- [x] 06-04-PLAN.md -- Prometheus + Grafana metrics stack, custom metrics, uptime alerting via Resend SMTP
 
 ### Phase 7: Web Presence
 **Goal**: LunchBot has a public web presence with landing page, privacy policy, and support page served from the existing Flask app
