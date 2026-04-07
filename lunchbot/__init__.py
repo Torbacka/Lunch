@@ -139,4 +139,7 @@ def create_app(config_name='dev'):
     app.register_blueprint(events_bp)
     app.register_blueprint(setup_bp)
 
+    from lunchbot.blueprints.web import bp as web_bp
+    app.register_blueprint(web_bp)
+
     return app
