@@ -50,11 +50,13 @@ Exceptions: none
 | Role | Size | Weight | Line Height | Usage |
 |------|------|--------|-------------|-------|
 | Body | 16px | 400 | 1.5 | Paragraph text, privacy policy content, support page text |
-| Label | 14px | 500 | 1.4 | Section subheadings in privacy policy, footer links |
+| Label | 14px | 400 | 1.4 | Section subheadings in privacy policy, footer links, step titles in "How it works" |
 | Heading | 20px | 600 | 1.2 | Page headings (h1) for privacy and support, section headings on landing |
 | Display | 32px | 600 | 1.2 | Landing page hero heading only |
 
-Source: Body 16px/400, Heading 20px/600, Label 14px/500 match existing `oauth.py` and `setup.py`. Display 32px is new for the landing page hero — justified because the landing page is a marketing surface, not a utility page.
+2 weights declared: 400 (regular) and 600 (semibold). Label at 14px is visually distinct from Body at 16px through size alone — no intermediate weight needed.
+
+Source: Body 16px/400, Heading 20px/600 match existing `oauth.py` and `setup.py`. Display 32px is new for the landing page hero — justified because the landing page is a marketing surface, not a utility page.
 
 ---
 
@@ -84,6 +86,8 @@ Source: All colors extracted from existing `oauth.py` and `setup.py`. `#F9FAFB` 
 
 ## Layout Contract
 
+Primary focal point: hero display heading + "Add to Slack" button — largest text on page (32px/600), positioned directly below nav, drawing the eye first on page load.
+
 ### Landing Page (`/`)
 
 | Property | Value |
@@ -96,7 +100,7 @@ Sections (top to bottom):
 
 1. **Nav bar** — "LunchBot" text left, links (Privacy, Support) right. Full-width, 16px vertical padding, border-bottom #D1D5DB.
 2. **Hero** — Display heading (32px/600), body paragraph (16px/400), "Add to Slack" button. 64px top padding, 48px bottom padding.
-3. **How it works** — 3-step numbered list. Each step: Label (14px/500) for step title, Body (16px/400) for description. 48px top margin from hero.
+3. **How it works** — 3-step numbered list. Each step: Label (14px/400) for step title, Body (16px/400) for description. 48px top margin from hero.
 4. **Footer** — Links to Privacy and Support. Muted text (#6B7280) at 14px. 48px top margin, 24px bottom padding. Border-top #D1D5DB.
 
 ### Privacy Policy (`/privacy`)
@@ -106,7 +110,7 @@ Sections (top to bottom):
 | Container max-width | 640px |
 | Container horizontal padding | 16px |
 
-Sections: Nav bar (same as landing) then prose content. Use Heading (20px/600) for page title, Label (14px/500) for section subheadings (bold), Body (16px/400) for content. Unordered lists for data points. 16px margin between paragraphs. 24px margin before each section subheading.
+Sections: Nav bar (same as landing) then prose content. Use Heading (20px/600) for page title, Label (14px/400) for section subheadings, Body (16px/400) for content. Unordered lists for data points. 16px margin between paragraphs. 24px margin before each section subheading.
 
 ### Support Page (`/support`)
 
