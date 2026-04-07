@@ -96,7 +96,7 @@ Plans:
   2. Each poll includes 1-2 restaurants selected by Thompson sampling based on the workspace's historical vote data
   3. Remaining poll slots are filled with random restaurants not shown in the last N polls
   4. Admin can configure total poll size and the ratio of smart picks to random picks via slash command
-**Plans**: TBD
+**Plans**: 1 plan
 
 Plans:
 - [ ] 04-01: TBD
@@ -143,11 +143,11 @@ Plans:
   1. Landing page at the app URL describes LunchBot and has a working "Add to Slack" button that initiates OAuth installation
   2. Privacy policy page documents all actual data collected (workspace ID, display names, vote history, bot token), retention periods, and deletion process
   3. Support page provides a contact method (email or form) with a 2-business-day response commitment, no account signup required
-**Plans**: TBD
+**Plans**: 1 plan
 **UI hint**: yes
 
 Plans:
-- [ ] 07-01: TBD
+- [ ] 07-01-PLAN.md — Web blueprint with landing page, privacy policy, support page, and tests
 
 ### Phase 8: Marketplace Submission
 **Goal**: LunchBot passes Slack App Directory review and is listed for public installation
@@ -159,7 +159,7 @@ Plans:
   3. App icon, directory screenshots, and YouTube demo video meet Slack's format requirements
   4. Bot is installed on 5+ active workspaces via beta rollout
   5. App is submitted to Slack App Directory and review process is initiated
-**Plans**: TBD
+**Plans**: 1 plan
 
 Plans:
 - [ ] 08-01: TBD
