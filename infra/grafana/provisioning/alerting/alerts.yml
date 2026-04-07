@@ -16,7 +16,7 @@ groups:
               to: 0
             datasourceUid: prometheus
             model:
-              expr: up{job="lunchbot"}
+              expr: max(up{job="lunchbot"})
               instant: true
               refId: A
           - refId: B
