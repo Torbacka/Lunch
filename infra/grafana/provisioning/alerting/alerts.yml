@@ -58,7 +58,7 @@ contactPoints:
       - uid: email-alert-receiver
         type: email
         settings:
-          addresses: "admin@yourdomain.com"
+          addresses: "lunch-alert@torbacka.se"
           singleEmail: true
         disableResolveMessage: false
 
