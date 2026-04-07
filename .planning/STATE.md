@@ -87,12 +87,6 @@ None yet.
 
 ## Session Continuity
 
-<<<<<<< Updated upstream
-Last session: 2026-04-06T17:42:05.655Z
-Stopped at: Phase 6 context gathered
-Resume file: .planning/phases/06-observability/06-CONTEXT.md
-=======
 Last session: 2026-04-07T19:48:38.244Z
 Stopped at: Phase 7 UI-SPEC approved
 Resume file: .planning/phases/07-web-presence/07-UI-SPEC.md
->>>>>>> Stashed changes
