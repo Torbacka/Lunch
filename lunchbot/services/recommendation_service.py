@@ -3,6 +3,7 @@
 Orchestrates smart restaurant selection for polls using Beta-Bernoulli
 Thompson sampling. Stats are lazily updated from completed polls.
 """
+import json
 import logging
 from datetime import date
 
@@ -11,6 +12,8 @@ from flask import current_app, g
 
 from lunchbot.client import db_client
 from lunchbot.client.workspace_client import get_workspace_settings
+from lunchbot.services.cuisine_map import classify_cuisine
+from lunchbot.services.distance import estimate_walking_minutes
 
 logger = logging.getLogger(__name__)
 
@@ -182,12 +185,55 @@ def ensure_poll_options(poll_date=None, workspace_id=None):
         candidates, random_count, exclude_ids=smart_ids
     )
 
-    # Step 6: Add all picks to today's poll
+    # Resolve workspace location for walking distance
+    origin_lat, origin_lon = _parse_location(workspace_id)
+
+    # Step 6: Add all picks to today's poll with metadata
     added = 0
-    for pick in smart_picks + random_picks:
-        db_client.upsert_suggestion(poll_date, pick['restaurant_id'], workspace_id)
-        added += 1
+    for pick_type, picks in [('smart', smart_picks), ('random', random_picks)]:
+        for pick in picks:
+            cuisine = classify_cuisine(pick.get('types'), pick.get('name', ''))
+            walking_mins = _compute_walking_minutes(pick, origin_lat, origin_lon)
+            db_client.upsert_suggestion(
+                poll_date, pick['restaurant_id'], workspace_id,
+                pick_type=pick_type,
+                cuisine=cuisine,
+                walking_minutes=walking_mins,
+            )
+            added += 1
 
     logger.info('Added %d options to poll: %d smart, %d random',
                 added, len(smart_picks), len(random_picks))
     return added
+
+
+def _parse_location(workspace_id):
+    """Parse workspace location string into (lat, lon) floats."""
+    if not workspace_id:
+        return None, None
+    settings = get_workspace_settings(workspace_id)
+    loc = (settings or {}).get('location', '')
+    if not loc or ',' not in loc:
+        return None, None
+    parts = loc.split(',')
+    try:
+        return float(parts[0]), float(parts[1])
+    except (ValueError, IndexError):
+        return None, None
+
+
+def _compute_walking_minutes(pick, origin_lat, origin_lon):
+    """Extract restaurant coordinates from geometry JSONB and compute walk time."""
+    if origin_lat is None or origin_lon is None:
+        return None
+    geometry = pick.get('geometry')
+    if not geometry:
+        return None
+    if isinstance(geometry, str):
+        geometry = json.loads(geometry)
+    location = geometry.get('location', {})
+    dest_lat = location.get('lat')
+    dest_lon = location.get('lng')
+    if dest_lat is None or dest_lon is None:
+        return None
+    return estimate_walking_minutes(origin_lat, origin_lon, dest_lat, dest_lon)

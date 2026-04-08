@@ -16,6 +16,7 @@ bp = Blueprint('polls', __name__)
 HELP_TEXT = (
     "LunchBot commands:\n"
     "\u2022 `/lunch` \u2014 post today's restaurant poll\n"
+    "\u2022 `/lunch close` \u2014 close the poll and announce the winner\n"
     "\u2022 `/lunch help` \u2014 show this help message"
 )
 
@@ -33,6 +34,16 @@ def slash_command():
 
     if text == 'help':
         return jsonify({'response_type': 'ephemeral', 'text': HELP_TEXT}), 200
+
+    if text == 'close':
+        try:
+            poll_service.close_poll(channel, team_id)
+        except ValueError:
+            return jsonify({
+                'response_type': 'ephemeral',
+                'text': 'LunchBot is not configured for this workspace. Install at /slack/install'
+            }), 200
+        return '', 200
 
     # Default: trigger poll (empty text, 'start', or any other text)
     try:

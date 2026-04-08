@@ -18,11 +18,12 @@ def get_votes(poll_date):
     """Get all poll options with votes for a given date.
     Replaces mongo_client.get_votes().
     Returns list of dicts with keys: id, restaurant_id, place_id, name, rating,
-    emoji, url, votes (list of user_id strings).
+    emoji, url, cuisine, walking_minutes, pick_type, votes (list of user_id strings).
     """
     return execute_with_tenant("""
         SELECT po.id, po.restaurant_id, r.place_id, r.name, r.rating,
                r.emoji, r.url, r.website, r.price_level,
+               po.cuisine, po.walking_minutes, po.pick_type,
                COALESCE(
                    array_agg(v.user_id) FILTER (WHERE v.user_id IS NOT NULL),
                    '{}'
@@ -81,7 +82,8 @@ def toggle_vote(poll_option_id, user_id):
             return 'added'
 
 
-def upsert_suggestion(poll_date, restaurant_id, workspace_id=None):
+def upsert_suggestion(poll_date, restaurant_id, workspace_id=None,
+                      pick_type='random', cuisine=None, walking_minutes=None):
     """Add a restaurant as a poll option for today. Replaces mongo_client.update_suggestions().
     Creates poll if it doesn't exist, then adds restaurant as option.
     """
@@ -109,10 +111,20 @@ def upsert_suggestion(poll_date, restaurant_id, workspace_id=None):
 
             # Add restaurant as poll option
             cur.execute("""
-                INSERT INTO poll_options (poll_id, restaurant_id, display_order, workspace_id)
-                VALUES (%(poll_id)s, %(restaurant_id)s, %(display_order)s, %(workspace_id)s)
+                INSERT INTO poll_options (poll_id, restaurant_id, display_order, workspace_id,
+                                         pick_type, cuisine, walking_minutes)
+                VALUES (%(poll_id)s, %(restaurant_id)s, %(display_order)s, %(workspace_id)s,
+                        %(pick_type)s, %(cuisine)s, %(walking_minutes)s)
                 ON CONFLICT (poll_id, restaurant_id) DO NOTHING
-            """, {'poll_id': poll_id, 'restaurant_id': restaurant_id, 'display_order': next_order, 'workspace_id': workspace_id})
+            """, {
+                'poll_id': poll_id,
+                'restaurant_id': restaurant_id,
+                'display_order': next_order,
+                'workspace_id': workspace_id,
+                'pick_type': pick_type,
+                'cuisine': cuisine,
+                'walking_minutes': walking_minutes,
+            })
 
             return poll_id
 
@@ -257,12 +269,14 @@ def get_or_create_stats(restaurant_id, workspace_id=None):
 def get_candidate_pool(poll_date):
     """Get all workspace restaurants NOT in today's poll, with their stats.
     Per D-15: candidate pool is all restaurants not already in today's poll.
-    Returns list of dicts with restaurant_id, name, place_id, alpha, beta, times_shown.
+    Returns list of dicts with restaurant_id, name, place_id, alpha, beta, times_shown,
+    plus types and geometry for cuisine/distance computation.
     Uses LEFT JOIN so restaurants without stats get defaults alpha=1.0, beta=1.0 (D-07).
     Handles Pitfall 2: COALESCE ensures NULL stats rows get uninformative prior.
     """
     return execute_with_tenant("""
         SELECT r.id AS restaurant_id, r.name, r.place_id,
+               r.types, r.geometry,
                COALESCE(rs.alpha, 1.0) AS alpha,
                COALESCE(rs.beta, 1.0) AS beta,
                COALESCE(rs.times_shown, 0) AS times_shown
@@ -364,3 +378,24 @@ def mark_poll_stats_processed(poll_id):
         WHERE id = %(poll_id)s
         RETURNING id, stats_processed_at
     """, {'poll_id': poll_id}, fetch='one')
+
+
+def get_poll_winner(poll_date):
+    """Get the top-voted restaurant for a given poll date.
+    Returns dict with name, emoji, vote_count, or None if no votes.
+    Ties broken by display_order (first option wins).
+    """
+    return execute_with_tenant("""
+        SELECT r.name, r.emoji, r.url, r.website,
+               po.cuisine, po.walking_minutes,
+               COUNT(v.id) AS vote_count
+        FROM poll_options po
+        JOIN restaurants r ON r.id = po.restaurant_id
+        JOIN polls p ON p.id = po.poll_id
+        LEFT JOIN votes v ON v.poll_option_id = po.id
+        WHERE p.poll_date = %(poll_date)s
+        GROUP BY po.id, r.id
+        HAVING COUNT(v.id) > 0
+        ORDER BY vote_count DESC, po.display_order ASC
+        LIMIT 1
+    """, {'poll_date': poll_date}, fetch='one')

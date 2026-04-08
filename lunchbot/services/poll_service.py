@@ -21,84 +21,180 @@ def build_poll_blocks(options):
 
     Args:
         options: List of option dicts from db_client.get_votes().
-            Each dict has: id, name, rating, emoji, url, votes (list of user_ids).
+            Each dict has: id, name, rating, emoji, url, cuisine,
+            walking_minutes, pick_type, votes (list of user_ids).
 
     Returns:
         List of Block Kit block dicts ready for Slack API.
     """
     blocks = []
+    total_votes = 0
 
-    # Header
+    # Header block
+    blocks.append({
+        'type': 'header',
+        'text': {
+            'type': 'plain_text',
+            'text': ':fork_and_knife: Lunch Poll',
+            'emoji': True,
+        }
+    })
     blocks.append({
         'type': 'section',
         'text': {
             'type': 'mrkdwn',
-            'text': ':fork_and_knife: *Where should we eat today?*'
+            'text': 'Where should we eat today?'
         }
     })
     blocks.append({'type': 'divider'})
 
     for option in options:
-        emoji = option.get('emoji') or 'knife_fork_plate'
+        votes = option.get('votes') or []
+        total_votes += len(votes)
 
-        # Restaurant section with vote button
+        # Restaurant line with cuisine, distance, pick badge
+        line = _restaurant_line(option)
         blocks.append({
             'type': 'section',
             'text': {
                 'type': 'mrkdwn',
-                'text': f':{emoji}: *{option["name"]}* {option.get("rating", "")}:star:'
+                'text': line,
             },
             'accessory': {
                 'type': 'button',
                 'text': {
                     'type': 'plain_text',
-                    'text': 'vote',
-                    'emoji': True
+                    'text': ':ballot_box: Vote',
+                    'emoji': True,
                 },
-                'value': str(option['id'])
+                'value': str(option['id']),
+                'style': 'primary',
             }
         })
 
-        # Vote count context block (with voter avatars if available)
+        # Voter avatars + count
         voter_elements = option.get('voter_elements')
-        if voter_elements:
-            blocks.append({
-                'type': 'context',
-                'elements': voter_elements
-            })
-        else:
-            votes = option.get('votes') or []
-            if votes:
-                count = len(votes)
-                vote_word = 'vote' if count == 1 else 'votes'
-                vote_text = f'{count} {vote_word}'
-            else:
-                vote_text = 'No votes'
+        if not voter_elements:
+            voter_elements = _fallback_vote_text(votes)
+        blocks.append({'type': 'context', 'elements': voter_elements})
 
-            blocks.append({
-                'type': 'context',
-                'elements': [{
-                    'type': 'plain_text',
-                    'emoji': True,
-                    'text': vote_text
-                }]
-            })
-
-        # URL context block — prefer website (restaurant page), fall back to Google Maps url
+        # Link (optional)
         link = option.get('website') or option.get('url') or ''
         if link:
             blocks.append({
                 'type': 'context',
-                'elements': [{
-                    'type': 'mrkdwn',
-                    'text': f'<{link}|More info>'
-                }]
+                'elements': [{'type': 'mrkdwn', 'text': f'<{link}|:round_pushpin: More info>'}]
             })
 
-        # Divider
         blocks.append({'type': 'divider'})
 
+    # Footer with total vote count
+    vote_word = 'vote' if total_votes == 1 else 'votes'
+    blocks.append({
+        'type': 'context',
+        'elements': [{'type': 'mrkdwn', 'text': f':bar_chart: *{total_votes} {vote_word}*'}]
+    })
+
     return blocks
+
+
+def _restaurant_line(option):
+    """Build mrkdwn text: :emoji: *Name* · Cuisine  :walking: Xmin  :brain: Smart"""
+    emoji = option.get('emoji') or 'fork_and_knife'
+    parts = [f':{emoji}: *{option["name"]}*']
+
+    if cuisine := option.get('cuisine'):
+        parts[0] += f' \u00b7 {cuisine}'
+
+    if (mins := option.get('walking_minutes')) is not None:
+        parts.append(f':walking: {mins} min')
+
+    pick_type = option.get('pick_type', 'random')
+    badge = ':brain: `Smart`' if pick_type == 'smart' else ':game_die: `Wild`'
+    parts.append(badge)
+
+    return '  '.join(parts)
+
+
+def _fallback_vote_text(votes):
+    """Fallback context elements when voter_elements aren't pre-built."""
+    if votes:
+        count = len(votes)
+        return [{'type': 'plain_text', 'emoji': True,
+                 'text': f'{count} {"vote" if count == 1 else "votes"}'}]
+    return [{'type': 'mrkdwn', 'text': '_No votes yet_'}]
+
+
+def close_poll(channel, team_id):
+    """Close today's poll and announce the winner.
+
+    Finds the restaurant with the most votes and posts a trophy
+    announcement message to the channel.
+
+    Args:
+        channel: Slack channel ID to post the announcement
+        team_id: Slack team ID for workspace token resolution
+
+    Returns:
+        Slack API response dict, or None if no votes were cast.
+    """
+    from datetime import date as _date
+    winner = db_client.get_poll_winner(_date.today())
+    if not winner:
+        blocks = [{
+            'type': 'section',
+            'text': {
+                'type': 'mrkdwn',
+                'text': ':shrug: No votes were cast today. Maybe tomorrow!'
+            }
+        }]
+        return slack_client.post_message(channel, blocks, team_id)
+
+    emoji = winner.get('emoji') or 'fork_and_knife'
+    name = winner['name']
+    vote_count = winner['vote_count']
+    vote_word = 'vote' if vote_count == 1 else 'votes'
+
+    blocks = [
+        {
+            'type': 'header',
+            'text': {
+                'type': 'plain_text',
+                'text': ':trophy: We have a winner!',
+                'emoji': True,
+            }
+        },
+        {
+            'type': 'section',
+            'text': {
+                'type': 'mrkdwn',
+                'text': f':{emoji}: *{name}* won with *{vote_count} {vote_word}*!',
+            }
+        },
+    ]
+
+    # Add cuisine and walking info if available
+    details = []
+    if winner.get('cuisine'):
+        details.append(winner['cuisine'])
+    if winner.get('walking_minutes') is not None:
+        details.append(f':walking: {winner["walking_minutes"]} min walk')
+    if details:
+        blocks.append({
+            'type': 'context',
+            'elements': [{'type': 'mrkdwn', 'text': ' \u00b7 '.join(details)}]
+        })
+
+    # Add link if available
+    link = winner.get('website') or winner.get('url') or ''
+    if link:
+        blocks.append({
+            'type': 'context',
+            'elements': [{'type': 'mrkdwn', 'text': f'<{link}|:round_pushpin: Directions>'}]
+        })
+
+    logger.info('poll_winner_announced', winner=name, votes=vote_count, team_id=team_id)
+    return slack_client.post_message(channel, blocks, team_id)
 
 
 def push_poll(channel, team_id, trigger_source='manual'):
