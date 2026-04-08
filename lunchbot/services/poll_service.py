@@ -28,7 +28,7 @@ def build_poll_blocks(options):
         List of Block Kit block dicts ready for Slack API.
     """
     blocks = []
-    total_votes = 0
+    all_voter_ids = set()
 
     # Header block
     blocks.append({
@@ -50,7 +50,7 @@ def build_poll_blocks(options):
 
     for option in options:
         votes = option.get('votes') or []
-        total_votes += len(votes)
+        all_voter_ids.update(votes)
 
         # Restaurant line with cuisine, distance, pick badge
         line = _restaurant_line(option)
@@ -64,7 +64,7 @@ def build_poll_blocks(options):
                 'type': 'button',
                 'text': {
                     'type': 'plain_text',
-                    'text': ':ballot_box: Vote',
+                    'text': ':ballot_box_with_ballot: Vote',
                     'emoji': True,
                 },
                 'value': str(option['id']),
@@ -88,20 +88,25 @@ def build_poll_blocks(options):
 
         blocks.append({'type': 'divider'})
 
-    # Footer with total vote count
-    vote_word = 'vote' if total_votes == 1 else 'votes'
+    # Footer with unique voter count
+    unique_count = len(all_voter_ids)
+    voter_word = 'voter' if unique_count == 1 else 'voters'
     blocks.append({
         'type': 'context',
-        'elements': [{'type': 'mrkdwn', 'text': f':bar_chart: *{total_votes} {vote_word}*'}]
+        'elements': [{'type': 'mrkdwn', 'text': f':bar_chart: *{unique_count} {voter_word}*'}]
     })
 
     return blocks
 
 
 def _restaurant_line(option):
-    """Build mrkdwn text: :emoji: *Name* · Cuisine  :walking: Xmin  :brain: Smart"""
+    """Build mrkdwn text: :emoji: *Name* rating · Cuisine  :walking: Xmin  :brain: Smart"""
     emoji = option.get('emoji') or 'fork_and_knife'
-    parts = [f':{emoji}: *{option["name"]}*']
+    rating = option.get('rating')
+    name_part = f':{emoji}: *{option["name"]}*'
+    if rating:
+        name_part += f' {rating}:star:'
+    parts = [name_part]
 
     if cuisine := option.get('cuisine'):
         parts[0] += f' \u00b7 {cuisine}'
@@ -110,7 +115,7 @@ def _restaurant_line(option):
         parts.append(f':walking: {mins} min')
 
     pick_type = option.get('pick_type', 'random')
-    badge = ':brain: `Smart`' if pick_type == 'smart' else ':game_die: `Wild`'
+    badge = ':brain: `Smart`' if pick_type == 'smart' else ':game_die: `Wild Card`'
     parts.append(badge)
 
     return '  '.join(parts)

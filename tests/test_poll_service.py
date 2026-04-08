@@ -73,6 +73,14 @@ class TestBuildPollBlocks:
             assert option_section['accessory']['value'] == '1'
             assert option_section['accessory']['style'] == 'primary'
 
+    def test_rating_in_option_text(self, app):
+        with app.app_context():
+            from lunchbot.services.poll_service import build_poll_blocks
+            blocks = build_poll_blocks(SAMPLE_OPTIONS)
+            text = blocks[3]['text']['text']
+            assert '4.5' in text
+            assert ':star:' in text
+
     def test_cuisine_in_option_text(self, app):
         with app.app_context():
             from lunchbot.services.poll_service import build_poll_blocks
@@ -94,14 +102,14 @@ class TestBuildPollBlocks:
             text = blocks[3]['text']['text']
             assert '`Smart`' in text
 
-    def test_wild_badge_for_random_pick(self, app):
+    def test_wild_card_badge_for_random_pick(self, app):
         with app.app_context():
             from lunchbot.services.poll_service import build_poll_blocks
             blocks = build_poll_blocks(SAMPLE_OPTIONS)
             # Second option starts at index 7 (3 header + 4 per first option)
             second_option = blocks[7]
             text = second_option['text']['text']
-            assert '`Wild`' in text
+            assert '`Wild Card`' in text
 
     def test_vote_count_context(self, app):
         with app.app_context():
@@ -160,17 +168,17 @@ class TestBuildPollBlocks:
             second_section = blocks[7]
             assert ':fork_and_knife:' in second_section['text']['text']
 
-    def test_footer_total_votes(self, app):
-        """Footer should show total vote count."""
+    def test_footer_unique_voters(self, app):
+        """Footer should show unique voter count."""
         with app.app_context():
             from lunchbot.services.poll_service import build_poll_blocks
             blocks = build_poll_blocks(SAMPLE_OPTIONS)
             footer = blocks[-1]
             assert footer['type'] == 'context'
-            assert '2 votes' in footer['elements'][0]['text']
+            assert '2 voters' in footer['elements'][0]['text']
 
-    def test_footer_zero_votes(self, app):
-        """Footer should show 0 votes when nobody voted."""
+    def test_footer_zero_voters(self, app):
+        """Footer should show 0 voters when nobody voted."""
         options = [{
             'id': 1, 'name': 'Test', 'rating': 4.0, 'emoji': 'pizza',
             'url': '', 'votes': [], 'pick_type': 'random',
@@ -179,7 +187,22 @@ class TestBuildPollBlocks:
             from lunchbot.services.poll_service import build_poll_blocks
             blocks = build_poll_blocks(options)
             footer = blocks[-1]
-            assert '0 votes' in footer['elements'][0]['text']
+            assert '0 voters' in footer['elements'][0]['text']
+
+    def test_footer_deduplicates_voters(self, app):
+        """Footer should count each user only once even if they voted on multiple options."""
+        options = [
+            {'id': 1, 'name': 'A', 'rating': 4.0, 'emoji': 'pizza',
+             'url': '', 'votes': ['U_ALICE', 'U_BOB'], 'pick_type': 'random'},
+            {'id': 2, 'name': 'B', 'rating': 3.5, 'emoji': 'taco',
+             'url': '', 'votes': ['U_ALICE', 'U_CAROL'], 'pick_type': 'random'},
+        ]
+        with app.app_context():
+            from lunchbot.services.poll_service import build_poll_blocks
+            blocks = build_poll_blocks(options)
+            footer = blocks[-1]
+            # 3 unique voters: ALICE, BOB, CAROL (ALICE voted twice but counted once)
+            assert '3 voters' in footer['elements'][0]['text']
 
     def test_no_cuisine_omitted(self, app):
         """When cuisine is None, it should not appear in the line."""
