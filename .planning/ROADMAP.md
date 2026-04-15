@@ -166,15 +166,18 @@ Plans:
 
 ### Phase 07.2: per-channel-thompson-sampling: office-scoped candidate pools + per-channel stats (INSERTED)
 
-**Goal:** Fix two live bugs from 07.1 UAT (G-01, G-02): polls must draw candidates only from the channel's bound office (`restaurants.location_id`), and Thompson sampling priors must be isolated per channel (`restaurant_stats` keyed by `(channel_id, restaurant_id)`) so teams sharing an office don't contaminate each other's posteriors.
+**Goal:** Fix two live bugs from 07.1 UAT (G-01 cross-office candidate leakage, G-02 cross-channel stats contamination) AND restructure scheduling so every poll is channel-bound: new `channel_schedules` table, channel-keyed APScheduler jobs, App Home per-channel schedule UI, `polls.slack_channel_id` NOT NULL, and the add-office modal gains restaurant seeding.
 **Requirements**: 07.1-HUMAN-UAT G-01, G-02 (no formal REQUIREMENTS.md IDs allocated)
 **Depends on:** Phase 07.1
 **Success Criteria** (what must be TRUE):
   1. A poll in a channel bound to office A returns only restaurants whose `location_id` matches office A (no cross-office leakage)
   2. Two channels bound to the same office accumulate independent `restaurant_stats` rows; votes in one channel do not shift the other channel's Thompson posteriors
-  3. Alembic migration 009 adds `restaurants.location_id` NOT NULL FK and re-keys `restaurant_stats` on `channel_id`, with existing data backfilled
-  4. Install and add-office seed paths tag newly seeded restaurants with the owning `location_id`
-  5. Regression tests cover the two-office isolation case and the same-office two-channel stats-divergence case
+  3. Alembic migration 009 adds `restaurants.location_id` NOT NULL FK (ON DELETE CASCADE), re-keys `restaurant_stats` on `(channel_id, restaurant_id)` with existing rows wiped to Beta(1,1) prior, adds `channel_schedules` table, and migrates `workspaces.poll_schedule_*` rows into it before dropping those columns plus `workspaces.poll_channel`
+  4. `polls.slack_channel_id` is NOT NULL; `upsert_suggestion` takes the channel as a required argument; every poll-creation call site passes it
+  5. Install flow AND add-office Slack modal both seed restaurants tagged with the owning `location_id` via a shared helper
+  6. APScheduler jobs are keyed `poll_{team_id}_{channel_id}`; `scheduler_service.load_all_schedules` / `update_schedule_job` read and write `channel_schedules`; the workspace-level schedule path is removed
+  7. App Home shows a per-channel schedule list with Edit / Add-schedule affordances; the Add-schedule modal's channel picker only lists channels the bot is a member of; the legacy workspace-level "Poll Channel" and "Poll Schedule" sections are removed
+  8. Regression tests cover: two-office candidate isolation (G-01), same-office two-channel stats divergence (G-02), channel_schedules migration of an existing workspace-level schedule, and the end-to-end scheduled poll path with per-channel attribution
 **Plans**: TBD
 
 Plans:
