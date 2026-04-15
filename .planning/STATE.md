@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: Phase 7 UI-SPEC approved
-last_updated: "2026-04-07T19:55:58.896Z"
-last_activity: 2026-04-07 -- Phase 07 execution started
+stopped_at: Phase 8 planned (3 plans, verified)
+last_updated: "2026-04-15T16:22:11.072Z"
+last_activity: "2026-04-15 - Completed quick task 260415-p4t: Add chat:write.public scope and per-channel office location selection"
 progress:
   total_phases: 5
-  completed_phases: 3
-  total_plans: 10
-  completed_plans: 9
-  percent: 90
+  completed_phases: 4
+  total_plans: 13
+  completed_plans: 10
+  percent: 77
 ---
 
 # Project State
@@ -28,7 +28,7 @@ See: .planning/PROJECT.md (updated 2026-04-06)
 Phase: 07 (web-presence) — EXECUTING
 Plan: 1 of 1
 Status: Executing Phase 07
-Last activity: 2026-04-07 -- Phase 07 execution started
+Last activity: 2026-04-15 - Completed quick task 260415-p4t: Add chat:write.public scope and per-channel office location selection
 
 Progress: [####......] 37%
 
@@ -84,9 +84,10 @@ None yet.
 |---|-------------|------|--------|-----------|
 | 260405-vqq | Set up blue-green Docker deployment infrastructure for LunchBot on home Ubuntu server | 2026-04-05 | da5f583 | [260405-vqq-set-up-blue-green-docker-deployment-infr](./quick/260405-vqq-set-up-blue-green-docker-deployment-infr/) |
 | 260406-abs | Fix deployment readiness: wsgi.py, Dockerfile CMD, migration step in deploy.sh | 2026-04-06 | 2962913 | [260406-abs-fix-deployment-readiness-wsgi-py-dockerf](./quick/260406-abs-fix-deployment-readiness-wsgi-py-dockerf/) |
+| 260415-p4t | Add chat:write.public scope and per-channel office location selection | 2026-04-15 | 6f46071 | [260415-p4t-add-chat-write-public-scope-and-per-chan](./quick/260415-p4t-add-chat-write-public-scope-and-per-chan/) |
 
 ## Session Continuity
 
-Last session: 2026-04-07T19:48:38.244Z
-Stopped at: Phase 7 UI-SPEC approved
-Resume file: .planning/phases/07-web-presence/07-UI-SPEC.md
+Last session: 2026-04-15T16:22:11.067Z
+Stopped at: Phase 8 planned (3 plans, verified)
+Resume file: .planning/phases/08-marketplace-submission/08-01-PLAN.md

@@ -68,6 +68,10 @@ def get_workspace_settings(team_id):
 
     Returns dict with poll_channel, schedule fields, poll_size,
     smart_picks, location. None if workspace not found or inactive.
+
+    NOTE: The `location` column is deprecated as of migration 007. New code
+    must NOT read it -- use resolve_location_for_channel instead. It is
+    retained in the SELECT only for rollback safety and legacy settings UI.
     """
     with get_pool().connection() as conn:
         with conn.cursor(row_factory=dict_row) as cur:
@@ -102,6 +106,147 @@ def update_workspace_settings(team_id, **kwargs):
                 updates
             )
             logger.info('Updated settings for workspace %s: %s', team_id, list(updates.keys()))
+
+
+def _set_tenant(conn, team_id):
+    """Set app.current_tenant so RLS policies on workspace_locations /
+    channel_locations allow access. team_id comes from Slack and is
+    alphanumeric -- safe to interpolate.
+    """
+    conn.execute(f"SET app.current_tenant = '{team_id}'")
+
+
+def list_workspace_locations(team_id):
+    """Return all workspace_locations rows for a team (ordered by id)."""
+    with get_pool().connection() as conn:
+        _set_tenant(conn, team_id)
+        with conn.cursor(row_factory=dict_row) as cur:
+            cur.execute("""
+                SELECT id, team_id, name, lat_lng, is_default, created_at
+                FROM workspace_locations
+                WHERE team_id = %(team_id)s
+                ORDER BY id
+            """, {'team_id': team_id})
+            return cur.fetchall()
+
+
+def create_workspace_location(team_id, name, lat_lng, is_default=False):
+    """Insert a new workspace_location. Returns the created row."""
+    with get_pool().connection() as conn:
+        _set_tenant(conn, team_id)
+        with conn.cursor(row_factory=dict_row) as cur:
+            cur.execute("""
+                INSERT INTO workspace_locations (team_id, name, lat_lng, is_default)
+                VALUES (%(team_id)s, %(name)s, %(lat_lng)s, %(is_default)s)
+                RETURNING id, team_id, name, lat_lng, is_default, created_at
+            """, {
+                'team_id': team_id,
+                'name': name,
+                'lat_lng': lat_lng,
+                'is_default': is_default,
+            })
+            row = cur.fetchone()
+            logger.info('Created workspace_location: team=%s name=%s', team_id, name)
+            return row
+
+
+def get_default_location(team_id):
+    """Return the is_default=true workspace_location row for a team, or None."""
+    with get_pool().connection() as conn:
+        _set_tenant(conn, team_id)
+        with conn.cursor(row_factory=dict_row) as cur:
+            cur.execute("""
+                SELECT id, team_id, name, lat_lng, is_default, created_at
+                FROM workspace_locations
+                WHERE team_id = %(team_id)s AND is_default = TRUE
+                ORDER BY id
+                LIMIT 1
+            """, {'team_id': team_id})
+            return cur.fetchone()
+
+
+def get_channel_location(team_id, channel_id):
+    """Return the bound workspace_location row for a channel, or None."""
+    with get_pool().connection() as conn:
+        _set_tenant(conn, team_id)
+        with conn.cursor(row_factory=dict_row) as cur:
+            cur.execute("""
+                SELECT wl.id, wl.team_id, wl.name, wl.lat_lng, wl.is_default, wl.created_at
+                FROM channel_locations cl
+                JOIN workspace_locations wl ON wl.id = cl.location_id
+                WHERE cl.team_id = %(team_id)s AND cl.channel_id = %(channel_id)s
+            """, {'team_id': team_id, 'channel_id': channel_id})
+            return cur.fetchone()
+
+
+def bind_channel_location(team_id, channel_id, location_id):
+    """Upsert the channel -> location binding."""
+    with get_pool().connection() as conn:
+        _set_tenant(conn, team_id)
+        with conn.cursor() as cur:
+            cur.execute("""
+                INSERT INTO channel_locations (team_id, channel_id, location_id)
+                VALUES (%(team_id)s, %(channel_id)s, %(location_id)s)
+                ON CONFLICT (team_id, channel_id) DO UPDATE SET
+                    location_id = EXCLUDED.location_id
+            """, {
+                'team_id': team_id,
+                'channel_id': channel_id,
+                'location_id': location_id,
+            })
+            logger.info('Bound channel %s to location %s (team=%s)',
+                        channel_id, location_id, team_id)
+
+
+def resolve_location_for_channel(team_id, channel_id):
+    """Resolve the effective workspace_location for a channel.
+
+    Contract:
+      1. If a channel binding exists -> return the joined location row.
+      2. Else if the workspace has exactly one workspace_locations row ->
+         auto-bind it to this channel (atomic) and return it.
+      3. Else -> return None (caller must prompt the user).
+    """
+    with get_pool().connection() as conn:
+        _set_tenant(conn, team_id)
+        with conn.cursor(row_factory=dict_row) as cur:
+            # 1. Existing binding
+            cur.execute("""
+                SELECT wl.id, wl.team_id, wl.name, wl.lat_lng, wl.is_default, wl.created_at
+                FROM channel_locations cl
+                JOIN workspace_locations wl ON wl.id = cl.location_id
+                WHERE cl.team_id = %(team_id)s AND cl.channel_id = %(channel_id)s
+            """, {'team_id': team_id, 'channel_id': channel_id})
+            existing = cur.fetchone()
+            if existing:
+                return existing
+
+            # 2. Single location -> auto-bind
+            cur.execute("""
+                SELECT id, team_id, name, lat_lng, is_default, created_at
+                FROM workspace_locations
+                WHERE team_id = %(team_id)s
+                ORDER BY id
+                LIMIT 2
+            """, {'team_id': team_id})
+            rows = cur.fetchall()
+            if len(rows) == 1:
+                only = rows[0]
+                cur.execute("""
+                    INSERT INTO channel_locations (team_id, channel_id, location_id)
+                    VALUES (%(team_id)s, %(channel_id)s, %(location_id)s)
+                    ON CONFLICT (team_id, channel_id) DO NOTHING
+                """, {
+                    'team_id': team_id,
+                    'channel_id': channel_id,
+                    'location_id': only['id'],
+                })
+                logger.info('Auto-bound channel %s to sole location %s (team=%s)',
+                            channel_id, only['id'], team_id)
+                return only
+
+            # 3. Zero or multiple -> caller must prompt
+            return None
 
 
 def deactivate_workspace(team_id):

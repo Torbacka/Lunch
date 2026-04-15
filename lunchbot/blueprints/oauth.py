@@ -15,7 +15,7 @@ logger = structlog.get_logger(__name__)
 
 bp = Blueprint('oauth', __name__, url_prefix='/slack')
 
-SCOPES = 'commands,chat:write,users:read'
+SCOPES = 'commands,chat:write,chat:write.public,users:read'
 
 
 def _redirect_uri():
