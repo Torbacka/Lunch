@@ -10,9 +10,13 @@ from datetime import date, time
 from flask import Blueprint, current_app, request, jsonify, g
 
 from lunchbot.client import places_client, db_client
-from lunchbot.client.workspace_client import get_workspace, get_workspace_settings, update_workspace_settings
+from lunchbot.client.workspace_client import (
+    get_workspace, get_workspace_settings, update_workspace_settings,
+    bind_channel_location, resolve_location_for_channel,
+)
 from lunchbot.client import slack_client
-from lunchbot.services import vote_service
+from lunchbot.services import vote_service, poll_service
+from lunchbot.blueprints.polls import CHANNEL_LOC_USE_DEFAULT, CHANNEL_LOC_PICK
 from lunchbot.services.app_home_service import (
     build_home_view, build_channel_modal, build_schedule_modal,
     build_poll_size_modal, build_location_modal, build_remove_schedule_modal,
@@ -92,8 +96,38 @@ def _handle_block_actions(payload):
     if action_id in _APP_HOME_ACTIONS:
         return _handle_app_home_action(action_id, team_id, trigger_id)
 
+    # Channel-location first-use binding actions
+    if action_id in (CHANNEL_LOC_USE_DEFAULT, CHANNEL_LOC_PICK):
+        return _handle_channel_location_bind(action_id, payload, first_action)
+
     # Legacy: existing vote/suggest handling
     return _handle_legacy_action(payload, first_action)
+
+
+def _handle_channel_location_bind(action_id, payload, first_action):
+    """Persist the user's office choice for this channel and post the poll."""
+    team_id = payload.get('team', {}).get('id', '')
+    channel_id = payload.get('channel', {}).get('id', '')
+
+    if action_id == CHANNEL_LOC_USE_DEFAULT:
+        raw = first_action.get('value', '')
+    else:  # CHANNEL_LOC_PICK
+        raw = first_action.get('selected_option', {}).get('value', '')
+
+    try:
+        location_id = int(raw)
+    except (TypeError, ValueError):
+        logger.warning('channel_location_bind_bad_value', value=raw, action_id=action_id)
+        return '', 200
+
+    bind_channel_location(team_id, channel_id, location_id)
+    logger.info('channel_location_bound', team_id=team_id, channel_id=channel_id,
+                location_id=location_id)
+    try:
+        poll_service.push_poll(channel_id, team_id, trigger_source='channel_bind')
+    except ValueError as e:
+        logger.warning('push_poll_after_bind_failed', error=str(e))
+    return '', 200
 
 
 def _handle_app_home_action(action_id, team_id, trigger_id):
@@ -288,8 +322,12 @@ def find_suggestions():
     search_value = payload.get('value', '')
     logger.info('suggestion_search', search_value=search_value)
 
-    workspace = get_workspace(g.workspace_id)
-    location = workspace.get('location') if workspace else None
+    # Resolve location via the channel binding (not the deprecated
+    # workspaces.location column). The external_select payload carries the
+    # channel id the user is interacting from.
+    channel_id = payload.get('channel', {}).get('id', '')
+    location_row = resolve_location_for_channel(g.workspace_id, channel_id) if channel_id else None
+    location = location_row.get('lat_lng') if location_row else None
     if not location:
         return jsonify({'options': []})
 

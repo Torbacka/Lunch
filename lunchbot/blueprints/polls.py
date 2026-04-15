@@ -176,18 +176,24 @@ def suggestion_message():
 
 @bp.route('/seed', methods=['GET'])
 def seed():
-    """Seed restaurants and update emoji tags for a workspace.
+    """Seed restaurants and update emoji tags for a channel's office.
 
-    Requires team_id query param to resolve workspace location.
-    Searches Google Places for nearby restaurants and assigns emoji categories.
+    Requires team_id AND channel query params; resolves the effective office
+    location via the per-channel binding (migration 007). Seeding is now
+    channel-scoped so multi-location workspaces can seed each office
+    independently.
     """
-    from lunchbot.client.workspace_client import get_workspace
     team_id = request.args.get('team_id', '')
-    workspace = get_workspace(team_id) if team_id else None
-    location = workspace.get('location') if workspace else None
+    channel = request.args.get('channel', '')
+    if not team_id or not channel:
+        return 'team_id and channel query params required', 400
+
+    location_row = resolve_location_for_channel(team_id, channel)
+    location = location_row.get('lat_lng') if location_row else None
     if not location:
-        logger.warning('Seed skipped: no location for team_id=%s', team_id)
-        return 'No location configured for workspace', 400
-    logger.info('Restaurant seed triggered for team_id=%s', team_id)
+        logger.warning('Seed skipped: no location bound for team_id=%s channel=%s', team_id, channel)
+        return 'no location bound for channel', 400
+
+    logger.info('Restaurant seed triggered for team_id=%s channel=%s', team_id, channel)
     emoji_service.search_and_update_emoji(location)
     return '', 200
