@@ -164,6 +164,22 @@ Plans:
 - [x] 07.1-05-PLAN.md -- Always-prompt /lunch flow + Add-office Slack modal (non-admin allowed)
 - [x] 07.1-06-PLAN.md -- App Home Offices section + admin gating (rename/delete/set default/add)
 
+### Phase 07.2: per-channel-thompson-sampling: office-scoped candidate pools + per-channel stats (INSERTED)
+
+**Goal:** Fix two live bugs from 07.1 UAT (G-01, G-02): polls must draw candidates only from the channel's bound office (`restaurants.location_id`), and Thompson sampling priors must be isolated per channel (`restaurant_stats` keyed by `(channel_id, restaurant_id)`) so teams sharing an office don't contaminate each other's posteriors.
+**Requirements**: 07.1-HUMAN-UAT G-01, G-02 (no formal REQUIREMENTS.md IDs allocated)
+**Depends on:** Phase 07.1
+**Success Criteria** (what must be TRUE):
+  1. A poll in a channel bound to office A returns only restaurants whose `location_id` matches office A (no cross-office leakage)
+  2. Two channels bound to the same office accumulate independent `restaurant_stats` rows; votes in one channel do not shift the other channel's Thompson posteriors
+  3. Alembic migration 009 adds `restaurants.location_id` NOT NULL FK and re-keys `restaurant_stats` on `channel_id`, with existing data backfilled
+  4. Install and add-office seed paths tag newly seeded restaurants with the owning `location_id`
+  5. Regression tests cover the two-office isolation case and the same-office two-channel stats-divergence case
+**Plans**: TBD
+
+Plans:
+- [ ] 07.2-01: TBD
+
 ### Phase 8: Marketplace Submission
 **Goal**: LunchBot passes Slack App Directory review and is listed for public installation
 **Depends on**: Phase 5, Phase 6, Phase 7 (all features complete, observability active, web presence live)
