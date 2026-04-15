@@ -9,7 +9,7 @@ from flask import Blueprint, jsonify, request, current_app
 
 from lunchbot.services import poll_service, emoji_service
 from lunchbot.client.workspace_client import (
-    resolve_location_for_channel, list_workspace_locations, get_default_location,
+    resolve_location_for_channel, list_workspace_locations,
 )
 
 logger = logging.getLogger(__name__)
@@ -19,6 +19,7 @@ bp = Blueprint('polls', __name__)
 # Action IDs for the channel-location first-use prompt (dispatched in slack_actions.py)
 CHANNEL_LOC_USE_DEFAULT = 'channel_loc_use_default'
 CHANNEL_LOC_PICK = 'channel_loc_pick'
+CHANNEL_LOC_ADD_OFFICE = 'channel_loc_add_office'
 
 HELP_TEXT = (
     "LunchBot commands:\n"
@@ -29,41 +30,32 @@ HELP_TEXT = (
 
 
 def _build_channel_location_prompt(team_id, channel_id):
-    """Build the ephemeral Block Kit payload that asks the user to pick an
-    office location for an unbound channel.
+    """Build the ephemeral Block Kit payload that asks the user to pick or
+    create an office location for an unbound channel.
 
-    Shows:
-      - Optional "Use default office" button (if a default exists)
-      - Static select populated from list_workspace_locations
+    Phase 07.1 D-05/D-06/D-09: always prompts, even for single-office
+    workspaces; always exposes 'Add a new office'; zero-office workspaces
+    see only the Add button.
     """
     locations = list_workspace_locations(team_id) or []
-    default = get_default_location(team_id)
+
+    if locations:
+        text = (
+            ':round_pushpin: Pick an office for this channel, or add a new one. '
+            "We'll remember your choice for next time."
+        )
+    else:
+        text = (
+            ':round_pushpin: This workspace has no offices yet. '
+            'Add one to start posting lunch polls in this channel.'
+        )
 
     blocks = [{
         'type': 'section',
-        'text': {
-            'type': 'mrkdwn',
-            'text': (
-                ':round_pushpin: This channel is not bound to an office yet. '
-                'Pick one to start posting lunch polls here.'
-            ),
-        },
+        'text': {'type': 'mrkdwn', 'text': text},
     }]
 
     action_elements = []
-
-    if default:
-        action_elements.append({
-            'type': 'button',
-            'action_id': CHANNEL_LOC_USE_DEFAULT,
-            'text': {
-                'type': 'plain_text',
-                'text': f"Use default office: {default['name']}",
-                'emoji': True,
-            },
-            'value': str(default['id']),
-        })
-
     if locations:
         action_elements.append({
             'type': 'static_select',
@@ -77,20 +69,14 @@ def _build_channel_location_prompt(team_id, channel_id):
                 for loc in locations
             ],
         })
+    action_elements.append({
+        'type': 'button',
+        'action_id': CHANNEL_LOC_ADD_OFFICE,
+        'text': {'type': 'plain_text', 'text': 'Add a new office', 'emoji': True},
+        'value': channel_id,
+    })
 
-    if action_elements:
-        blocks.append({'type': 'actions', 'elements': action_elements})
-    else:
-        blocks.append({
-            'type': 'section',
-            'text': {
-                'type': 'mrkdwn',
-                'text': (
-                    '_No office locations are configured for this workspace. '
-                    'Open the LunchBot App Home to add one._'
-                ),
-            },
-        })
+    blocks.append({'type': 'actions', 'elements': action_elements})
 
     return {
         'response_type': 'ephemeral',

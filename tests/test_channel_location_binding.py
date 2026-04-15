@@ -221,14 +221,12 @@ def test_slash_command_bound_posts_directly(mock_resolver, mock_poll_service, cl
 
 
 @patch('lunchbot.blueprints.polls.list_workspace_locations')
-@patch('lunchbot.blueprints.polls.get_default_location')
 @patch('lunchbot.blueprints.polls.poll_service')
 @patch('lunchbot.blueprints.polls.resolve_location_for_channel')
 def test_slash_command_unbound_multi_location_prompts(
-    mock_resolver, mock_poll_service, mock_default, mock_list, client,
+    mock_resolver, mock_poll_service, mock_list, client,
 ):
     mock_resolver.return_value = None
-    mock_default.return_value = {'id': 1, 'name': 'HQ', 'lat_lng': '59,18'}
     mock_list.return_value = [
         {'id': 1, 'name': 'HQ', 'lat_lng': '59,18'},
         {'id': 2, 'name': 'Branch', 'lat_lng': '60,18'},
@@ -241,7 +239,7 @@ def test_slash_command_unbound_multi_location_prompts(
     body = json.loads(response.data)
     assert body.get('response_type') == 'ephemeral'
     blob = json.dumps(body)
-    assert 'channel_loc_use_default' in blob
+    assert 'channel_loc_add_office' in blob
     assert 'channel_loc_pick' in blob
     mock_poll_service.push_poll.assert_not_called()
 
