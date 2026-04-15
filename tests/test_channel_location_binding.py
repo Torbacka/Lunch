@@ -77,35 +77,46 @@ def test_migration_007_creates_tables_with_rls(app, clean_all_tables):
 
 
 def test_migration_007_backfill_creates_default_for_legacy_location(app, clean_all_tables):
-    """A workspace with a legacy location string gets one Default workspace_location row."""
-    with app.app_context():
-        pool = app.extensions['pool']
-        with pool.connection() as conn:
-            with conn.cursor() as cur:
-                # Clear any rows introduced by the live migration at initial run
-                cur.execute("DELETE FROM channel_locations")
-                cur.execute("DELETE FROM workspace_locations")
-                cur.execute("""
-                    INSERT INTO workspaces (team_id, team_name, bot_token_encrypted, location)
-                    VALUES ('T_BACKFILL', 'Backfill Co', 'enc', '59.3293,18.0686')
-                """)
-                # Re-run the backfill SQL (migration already ran; simulate by executing same INSERT)
-                cur.execute("""
-                    INSERT INTO workspace_locations (team_id, name, lat_lng, is_default)
-                    SELECT team_id, 'Default', location, TRUE
-                    FROM workspaces
-                    WHERE team_id = 'T_BACKFILL'
-                      AND location IS NOT NULL AND location <> ''
-                """)
-                cur.execute("""
-                    SELECT name, lat_lng, is_default FROM workspace_locations
-                    WHERE team_id = 'T_BACKFILL'
-                """)
-                rows = cur.fetchall()
-                assert len(rows) == 1
-                assert rows[0][0] == 'Default'
-                assert rows[0][1] == '59.3293,18.0686'
-                assert rows[0][2] is True
+    """A workspace with a legacy location string gets one Default workspace_location row.
+
+    Phase 07.1 migration 008 drops ``workspaces.location``, so we must
+    downgrade to 007 to exercise the legacy column, then re-upgrade to head
+    before leaving the test to keep the DB in the expected state for other
+    tests in the suite.
+    """
+    _alembic('downgrade', '007')
+    try:
+        with app.app_context():
+            pool = app.extensions['pool']
+            with pool.connection() as conn:
+                with conn.cursor() as cur:
+                    # Clear any rows introduced by the live migration at initial run
+                    cur.execute("DELETE FROM channel_locations")
+                    cur.execute("DELETE FROM workspace_locations")
+                    cur.execute("""
+                        INSERT INTO workspaces (team_id, team_name, bot_token_encrypted, location)
+                        VALUES ('T_BACKFILL', 'Backfill Co', 'enc', '59.3293,18.0686')
+                    """)
+                    # Re-run the backfill SQL (migration already ran; simulate by executing same INSERT)
+                    cur.execute("""
+                        INSERT INTO workspace_locations (team_id, name, lat_lng, is_default)
+                        SELECT team_id, 'Default', location, TRUE
+                        FROM workspaces
+                        WHERE team_id = 'T_BACKFILL'
+                          AND location IS NOT NULL AND location <> ''
+                    """)
+                    cur.execute("""
+                        SELECT name, lat_lng, is_default FROM workspace_locations
+                        WHERE team_id = 'T_BACKFILL'
+                    """)
+                    rows = cur.fetchall()
+                    assert len(rows) == 1
+                    assert rows[0][0] == 'Default'
+                    assert rows[0][1] == '59.3293,18.0686'
+                    assert rows[0][2] is True
+    finally:
+        up = _alembic('upgrade', 'head')
+        assert up.returncode == 0, f"re-upgrade failed: {up.stdout}{up.stderr}"
 
 
 # ---------------------------------------------------------------------------

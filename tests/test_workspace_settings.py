@@ -62,7 +62,9 @@ class TestGetWorkspaceSettings:
             assert 'poll_schedule_weekdays' in result
             assert 'poll_size' in result
             assert 'smart_picks' in result
-            assert 'location' in result
+            # Phase 07.1 plan 03 (migration 008) drops workspaces.location; the
+            # get_workspace_settings payload no longer exposes the column.
+            assert 'location' not in result
 
     def test_returns_none_for_missing_workspace(self, app, clean_all_tables):
         with app.app_context():
