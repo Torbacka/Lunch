@@ -4,10 +4,12 @@ Workspaces table is NOT subject to RLS (admin table).
 All functions use direct pool connections without tenant context.
 """
 import logging
+import structlog
 from psycopg.rows import dict_row
 from lunchbot.db import get_pool
 
 logger = logging.getLogger(__name__)
+_office_log = structlog.get_logger(__name__)
 
 
 def save_workspace(team_id, team_name, bot_token_encrypted, bot_user_id, scopes):
@@ -183,6 +185,95 @@ def bind_channel_location(team_id, channel_id, location_id):
             })
             logger.info('Bound channel %s to location %s (team=%s)',
                         channel_id, location_id, team_id)
+
+
+def rename_workspace_location(team_id, location_id, new_name, actor_user_id):
+    """Rename an office. Returns the updated row dict or None if not found."""
+    new_name = (new_name or '').strip()
+    if not new_name:
+        return None
+    with get_pool().connection() as conn:
+        _set_tenant(conn, team_id)
+        with conn.cursor(row_factory=dict_row) as cur:
+            cur.execute("""
+                UPDATE workspace_locations
+                SET name = %(name)s
+                WHERE team_id = %(team_id)s AND id = %(id)s
+                RETURNING id, team_id, name, lat_lng, is_default, created_at
+            """, {'team_id': team_id, 'id': location_id, 'name': new_name})
+            row = cur.fetchone()
+            if row:
+                _office_log.info(
+                    'office_rename',
+                    team_id=team_id,
+                    location_id=location_id,
+                    actor_user_id=actor_user_id,
+                    new_name=new_name,
+                )
+            return row
+
+
+def delete_workspace_location(team_id, location_id, actor_user_id):
+    """Delete an office. The FK ON DELETE CASCADE removes channel_locations
+    bindings automatically. Returns True if a row was deleted.
+    """
+    with get_pool().connection() as conn:
+        _set_tenant(conn, team_id)
+        with conn.cursor() as cur:
+            cur.execute("""
+                SELECT COUNT(*) FROM channel_locations
+                WHERE team_id = %(team_id)s AND location_id = %(id)s
+            """, {'team_id': team_id, 'id': location_id})
+            cascaded = cur.fetchone()[0]
+            cur.execute("""
+                DELETE FROM workspace_locations
+                WHERE team_id = %(team_id)s AND id = %(id)s
+            """, {'team_id': team_id, 'id': location_id})
+            deleted = cur.rowcount > 0
+            if deleted:
+                _office_log.info(
+                    'office_delete',
+                    team_id=team_id,
+                    location_id=location_id,
+                    actor_user_id=actor_user_id,
+                    cascaded_channel_count=cascaded,
+                )
+            return deleted
+
+
+def set_default_workspace_location(team_id, location_id, actor_user_id):
+    """Mark `location_id` as the workspace default in a single transaction.
+
+    Existence-check first so we never erase the current default when the
+    target id is invalid (D-17: exactly one default at a time). Returns the
+    updated row, or None if the target id doesn't belong to the workspace.
+    """
+    with get_pool().connection() as conn:
+        _set_tenant(conn, team_id)
+        with conn.cursor(row_factory=dict_row) as cur:
+            cur.execute("""
+                SELECT 1 FROM workspace_locations
+                WHERE team_id = %(team_id)s AND id = %(id)s
+            """, {'team_id': team_id, 'id': location_id})
+            if cur.fetchone() is None:
+                return None
+            cur.execute("""
+                UPDATE workspace_locations SET is_default = FALSE
+                WHERE team_id = %(team_id)s AND is_default = TRUE
+            """, {'team_id': team_id})
+            cur.execute("""
+                UPDATE workspace_locations SET is_default = TRUE
+                WHERE team_id = %(team_id)s AND id = %(id)s
+                RETURNING id, team_id, name, lat_lng, is_default, created_at
+            """, {'team_id': team_id, 'id': location_id})
+            row = cur.fetchone()
+            _office_log.info(
+                'office_set_default',
+                team_id=team_id,
+                location_id=location_id,
+                actor_user_id=actor_user_id,
+            )
+            return row
 
 
 def resolve_location_for_channel(team_id, channel_id):
