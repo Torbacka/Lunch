@@ -12,7 +12,7 @@ import threading
 
 from flask import Blueprint, request, current_app, g
 
-from lunchbot.client.workspace_client import get_workspace, update_workspace_location
+from lunchbot.client.workspace_client import get_workspace, create_workspace_location
 from lunchbot.services import emoji_service
 
 logger = logging.getLogger(__name__)
@@ -63,7 +63,10 @@ def setup_submit():
         return _form_page(team_id, error='Workspace not found. Please reinstall LunchBot.'), 400
 
     location = f'{lat},{lng}'
-    update_workspace_location(team_id, location)
+    # Phase 07.1: legacy workspaces.location column removed. Persist the
+    # office as a workspace_locations row so resolve_location_for_channel
+    # can find it. Plan 01 will replace this form with a Places autocomplete.
+    create_workspace_location(team_id, 'Default', location, is_default=True)
     logger.info('Location saved for team_id=%s: %s', team_id, location)
 
     app = current_app._get_current_object()

@@ -133,20 +133,16 @@ def test_resolver_returns_none_when_zero_locations(app, wc_team):
         assert resolve_location_for_channel(wc_team, 'C_EMPTY') is None
 
 
-def test_resolver_auto_binds_single_location(app, wc_team):
+def test_resolver_returns_none_when_single_unbound_location(app, wc_team):
     from lunchbot.client.workspace_client import (
         create_workspace_location, resolve_location_for_channel,
         get_channel_location,
     )
     with app.app_context():
-        loc = create_workspace_location(wc_team, 'HQ', '59.0,18.0', is_default=True)
-        got = resolve_location_for_channel(wc_team, 'C_SOLO')
-        assert got is not None
-        assert got['id'] == loc['id']
-        # Binding must have been persisted
-        bound = get_channel_location(wc_team, 'C_SOLO')
-        assert bound is not None
-        assert bound['id'] == loc['id']
+        create_workspace_location(wc_team, 'HQ', '59.0,18.0', is_default=True)
+        # Phase 07.1 D-08: resolver no longer auto-binds.
+        assert resolve_location_for_channel(wc_team, 'C_SOLO') is None
+        assert get_channel_location(wc_team, 'C_SOLO') is None
 
 
 def test_resolver_returns_none_with_multiple_unbound_locations(app, wc_team):
@@ -239,18 +235,26 @@ def test_slash_command_unbound_multi_location_prompts(
     mock_poll_service.push_poll.assert_not_called()
 
 
+@patch('lunchbot.blueprints.polls.list_workspace_locations')
 @patch('lunchbot.blueprints.polls.poll_service')
 @patch('lunchbot.blueprints.polls.resolve_location_for_channel')
-def test_slash_command_single_location_auto_binds(mock_resolver, mock_poll_service, client):
-    """Resolver auto-binds single location and returns row; slash posts directly."""
-    mock_resolver.return_value = {'id': 1, 'name': 'HQ', 'lat_lng': '59,18'}
-    mock_poll_service.push_poll.return_value = {'ok': True}
+def test_slash_command_single_location_still_prompts(
+    mock_resolver, mock_poll_service, mock_list, client,
+):
+    """D-05/D-08: even single-office workspaces always prompt on first /lunch.
+    The new always-prompt path does not consult get_default_location -- plan 05
+    removes that import from polls.py -- so we must NOT patch it here.
+    """
+    mock_resolver.return_value = None
+    mock_list.return_value = [{'id': 1, 'name': 'HQ', 'lat_lng': '59,18'}]
     response = client.post('/slack/command', data={
         'team_id': 'T_SOLO', 'command': '/lunch', 'text': '',
         'channel_id': 'C_SOLO', 'user_id': 'U1',
     })
     assert response.status_code == 200
-    mock_poll_service.push_poll.assert_called_once_with('C_SOLO', 'T_SOLO')
+    body = json.loads(response.data)
+    assert body.get('response_type') == 'ephemeral'
+    mock_poll_service.push_poll.assert_not_called()
 
 
 # ---------------------------------------------------------------------------
