@@ -4,6 +4,7 @@ Replaces service/client/places_client.py with Flask config-driven key access.
 T-03-12: API key read from config only, never logged.
 """
 import logging
+import uuid
 
 import requests
 from flask import current_app
@@ -72,6 +73,63 @@ def get_details(place_id):
         'placeid': place_id,
         'key': key,
     }
+    response = session.get(PLACES_BASE + 'details/json', params=params)
+    data = response.json()
+    _check_status(data, 'details')
+    return data
+
+
+def new_session_token():
+    """Return a fresh Places Autocomplete session token (uuid4 hex).
+
+    Bundle one Autocomplete sequence + one Details call under the same
+    token so Google bills a single session instead of per-keystroke
+    autocomplete pricing.
+    """
+    return uuid.uuid4().hex
+
+
+def autocomplete(query, session_token, types='establishment'):
+    """Google Places Autocomplete query (used by the install-form proxy).
+
+    Args:
+        query: user-typed string (e.g. 'Spotify HQ')
+        session_token: opaque token bundling this query with a later
+            get_place_details call — required for session-based billing.
+        types: Places types filter; default 'establishment' for office
+            name search.
+
+    Returns the full Google Places API JSON dict with 'predictions' list.
+    API key is read server-side only and never returned or logged.
+    """
+    key = current_app.config['GOOGLE_PLACES_API_KEY']
+    params = {
+        'input': query,
+        'sessiontoken': session_token,
+        'types': types,
+        'key': key,
+    }
+    response = session.get(PLACES_BASE + 'autocomplete/json', params=params)
+    data = response.json()
+    _check_status(data, 'autocomplete')
+    return data
+
+
+def get_place_details(place_id, session_token=None):
+    """Fetch minimal Place Details for an office: name, address, lat/lng.
+
+    Uses a restricted field mask (Basic tier only) to minimize billing.
+    If session_token is provided the call is charged as part of the
+    same Autocomplete session (Session Token pricing).
+    """
+    key = current_app.config['GOOGLE_PLACES_API_KEY']
+    params = {
+        'placeid': place_id,
+        'fields': 'place_id,name,formatted_address,geometry/location',
+        'key': key,
+    }
+    if session_token:
+        params['sessiontoken'] = session_token
     response = session.get(PLACES_BASE + 'details/json', params=params)
     data = response.json()
     _check_status(data, 'details')
