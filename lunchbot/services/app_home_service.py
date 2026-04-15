@@ -10,15 +10,21 @@ ACTION_BEGIN_SETUP = 'app_home_begin_setup'
 ACTION_EDIT_CHANNEL = 'app_home_edit_channel'
 ACTION_EDIT_SCHEDULE = 'app_home_edit_schedule'
 ACTION_EDIT_POLL_SIZE = 'app_home_edit_poll_size'
-ACTION_EDIT_LOCATION = 'app_home_edit_location'
 ACTION_REMOVE_SCHEDULE = 'app_home_remove_schedule'
+
+# Offices section action IDs (Phase 07.1 Plan 06)
+ACTION_ADD_OFFICE_FROM_HOME = 'app_home_add_office'
+ACTION_RENAME_OFFICE = 'app_home_rename_office'
+ACTION_SET_DEFAULT_OFFICE = 'app_home_set_default_office'
+ACTION_DELETE_OFFICE = 'app_home_delete_office'
 
 # Callback IDs for modal submissions
 CALLBACK_CHANNEL = 'modal_channel'
 CALLBACK_SCHEDULE = 'modal_schedule'
 CALLBACK_POLL_SIZE = 'modal_poll_size'
-CALLBACK_LOCATION = 'modal_location'
 CALLBACK_REMOVE_SCHEDULE = 'modal_remove_schedule'
+CALLBACK_RENAME_OFFICE = 'modal_rename_office'
+CALLBACK_DELETE_OFFICE = 'modal_delete_office'
 
 TIMEZONE_OPTIONS = [
     # Americas
@@ -53,20 +59,24 @@ def _format_time_12h(t):
     return f'{display_hour}:{minute:02d} {ampm}'
 
 
-def build_home_view(settings, is_admin=True):
+def build_home_view(settings, is_admin=True, locations=None):
     """Build the App Home tab view.
 
     Args:
         settings: dict from get_workspace_settings(), or None for fresh workspace
         is_admin: whether the viewing user is a workspace admin
+        locations: list of workspace_location rows (as from list_workspace_locations)
+                   or None. Caller is responsible for fetching; this module stays
+                   DB-free.
 
     Returns:
         dict with type 'home' and blocks list
     """
     is_configured = settings is not None and settings.get('poll_channel') is not None
+    locations = locations or []
 
     if is_configured:
-        blocks = _build_state_b(settings, is_admin)
+        blocks = _build_state_b(settings, is_admin, locations)
     else:
         blocks = _build_state_a(is_admin)
 
@@ -107,8 +117,9 @@ def _build_state_a(is_admin):
     return blocks
 
 
-def _build_state_b(settings, is_admin):
+def _build_state_b(settings, is_admin, locations=None):
     """State B: configured workspace with channel set."""
+    locations = locations or []
     blocks = [
         {'type': 'header', 'text': {'type': 'plain_text', 'text': 'LunchBot Settings'}},
         {'type': 'divider'},
@@ -209,22 +220,8 @@ def _build_state_b(settings, is_admin):
     blocks.append(poll_size_section)
     blocks.append({'type': 'divider'})
 
-    # Location row
-    location = settings.get('location') or 'Not set'
-    location_section = {
-        'type': 'section',
-        'text': {
-            'type': 'mrkdwn',
-            'text': f':round_pushpin: *Location*\n{location}',
-        },
-    }
-    if is_admin:
-        location_section['accessory'] = {
-            'type': 'button',
-            'text': {'type': 'plain_text', 'text': 'Edit'},
-            'action_id': ACTION_EDIT_LOCATION,
-        }
-    blocks.append(location_section)
+    # Offices section (Phase 07.1 Plan 06) — replaces legacy Location row
+    blocks.extend(_build_offices_section(locations, is_admin))
     blocks.append({'type': 'divider'})
 
     # Footer
@@ -447,46 +444,118 @@ def build_poll_size_modal(current_size=None, current_smart=None, team_id=None):
     }
 
 
-def build_location_modal(current_location=None, team_id=None):
-    """Build the location configuration modal.
+def _build_offices_section(locations, is_admin):
+    """Build the Offices section for App Home State B (Phase 07.1 Plan 06)."""
+    blocks = [
+        {
+            'type': 'section',
+            'text': {'type': 'mrkdwn', 'text': ':office: *Offices*'},
+        },
+        {
+            'type': 'actions',
+            'elements': [{
+                'type': 'button',
+                'action_id': ACTION_ADD_OFFICE_FROM_HOME,
+                'text': {'type': 'plain_text', 'text': 'Add office'},
+                'style': 'primary',
+            }],
+        },
+    ]
 
-    Args:
-        current_location: current location string, or None
-        team_id: workspace team ID for private_metadata
+    if not locations:
+        blocks.append({
+            'type': 'context',
+            'elements': [{
+                'type': 'mrkdwn',
+                'text': '_No offices yet — add one to get started._',
+            }],
+        })
+        return blocks
 
-    Returns:
-        Modal view dict
-    """
-    location_element = {
-        'type': 'plain_text_input',
-        'action_id': 'location_input',
-        'placeholder': {'type': 'plain_text', 'text': 'e.g. Stockholm, Sweden'},
-    }
-    if current_location:
-        location_element['initial_value'] = current_location
+    for loc in locations:
+        badge = '  :star: *default*' if loc.get('is_default') else ''
+        blocks.append({
+            'type': 'section',
+            'text': {
+                'type': 'mrkdwn',
+                'text': f"*{loc['name']}*{badge}\n_{loc['lat_lng']}_",
+            },
+        })
+        if is_admin:
+            elements = [{
+                'type': 'button',
+                'action_id': ACTION_RENAME_OFFICE,
+                'text': {'type': 'plain_text', 'text': 'Rename'},
+                'value': str(loc['id']),
+            }]
+            if not loc.get('is_default'):
+                elements.append({
+                    'type': 'button',
+                    'action_id': ACTION_SET_DEFAULT_OFFICE,
+                    'text': {'type': 'plain_text', 'text': 'Set default'},
+                    'value': str(loc['id']),
+                })
+            elements.append({
+                'type': 'button',
+                'action_id': ACTION_DELETE_OFFICE,
+                'text': {'type': 'plain_text', 'text': 'Delete'},
+                'style': 'danger',
+                'value': str(loc['id']),
+            })
+            blocks.append({'type': 'actions', 'elements': elements})
 
+    return blocks
+
+
+def build_rename_office_modal(team_id, location_id, current_name):
+    """Build the rename-office modal (Phase 07.1 Plan 06)."""
     return {
         'type': 'modal',
-        'callback_id': CALLBACK_LOCATION,
-        'title': {'type': 'plain_text', 'text': 'Search Location'},
-        'submit': {'type': 'plain_text', 'text': 'Save Location'},
-        'close': {'type': 'plain_text', 'text': 'Keep Current Location'},
-        'private_metadata': json.dumps({'team_id': team_id}),
-        'blocks': [
-            {
-                'type': 'input',
-                'block_id': 'location_input_block',
-                'label': {'type': 'plain_text', 'text': 'Location'},
-                'element': location_element,
+        'callback_id': CALLBACK_RENAME_OFFICE,
+        'title': {'type': 'plain_text', 'text': 'Rename office'},
+        'submit': {'type': 'plain_text', 'text': 'Save'},
+        'close': {'type': 'plain_text', 'text': 'Cancel'},
+        'private_metadata': json.dumps(
+            {'team_id': team_id, 'location_id': location_id},
+        ),
+        'blocks': [{
+            'type': 'input',
+            'block_id': 'office_name_block',
+            'label': {'type': 'plain_text', 'text': 'Office name'},
+            'element': {
+                'type': 'plain_text_input',
+                'action_id': 'office_name_input',
+                'initial_value': current_name or '',
+                'max_length': 80,
             },
-            {
-                'type': 'context',
-                'elements': [{
-                    'type': 'mrkdwn',
-                    'text': 'This location is used to search for nearby restaurants via Google Places.',
-                }],
+        }],
+    }
+
+
+def build_delete_office_modal(team_id, location_id, current_name):
+    """Build the delete-office confirmation modal (Phase 07.1 Plan 06)."""
+    return {
+        'type': 'modal',
+        'callback_id': CALLBACK_DELETE_OFFICE,
+        'title': {'type': 'plain_text', 'text': 'Delete office'},
+        'submit': {'type': 'plain_text', 'text': 'Delete'},
+        'close': {'type': 'plain_text', 'text': 'Cancel'},
+        'private_metadata': json.dumps({
+            'team_id': team_id,
+            'location_id': location_id,
+            'name': current_name,
+        }),
+        'blocks': [{
+            'type': 'section',
+            'text': {
+                'type': 'mrkdwn',
+                'text': (
+                    f"Delete *{current_name}*? Any channels bound to this office "
+                    'will be unbound and will prompt for a new office on the next '
+                    '`/lunch`.'
+                ),
             },
-        ],
+        }],
     }
 
 
