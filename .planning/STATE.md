@@ -5,7 +5,7 @@ milestone_name: milestone
 status: executing
 stopped_at: Phase 8 context gathered
 last_updated: "2026-04-15T16:03:39.576Z"
-last_activity: 2026-04-07 -- Phase 07 execution started
+last_activity: 2026-04-15 - Completed quick task 260415-p4t: chat:write.public scope and per-channel office location
 progress:
   total_phases: 5
   completed_phases: 4
@@ -28,7 +28,7 @@ See: .planning/PROJECT.md (updated 2026-04-06)
 Phase: 07 (web-presence) — EXECUTING
 Plan: 1 of 1
 Status: Executing Phase 07
-Last activity: 2026-04-07 -- Phase 07 execution started
+Last activity: 2026-04-15 - Completed quick task 260415-p4t: Add chat:write.public scope and per-channel office location selection
 
 Progress: [####......] 37%
 
@@ -84,6 +84,7 @@ None yet.
 |---|-------------|------|--------|-----------|
 | 260405-vqq | Set up blue-green Docker deployment infrastructure for LunchBot on home Ubuntu server | 2026-04-05 | da5f583 | [260405-vqq-set-up-blue-green-docker-deployment-infr](./quick/260405-vqq-set-up-blue-green-docker-deployment-infr/) |
 | 260406-abs | Fix deployment readiness: wsgi.py, Dockerfile CMD, migration step in deploy.sh | 2026-04-06 | 2962913 | [260406-abs-fix-deployment-readiness-wsgi-py-dockerf](./quick/260406-abs-fix-deployment-readiness-wsgi-py-dockerf/) |
+| 260415-p4t | Add chat:write.public scope and per-channel office location selection | 2026-04-15 | 6f46071 | [260415-p4t-add-chat-write-public-scope-and-per-chan](./quick/260415-p4t-add-chat-write-public-scope-and-per-chan/) |
 
 ## Session Continuity
 
