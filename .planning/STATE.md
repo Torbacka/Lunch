@@ -3,11 +3,11 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: Phase 8 planned (3 plans, verified)
-last_updated: "2026-04-15T16:22:11.072Z"
+stopped_at: Phase 07.1 context gathered (discuss mode)
+last_updated: "2026-04-15T18:13:13.002Z"
 last_activity: "2026-04-15 - Completed quick task 260415-p4t: Add chat:write.public scope and per-channel office location selection"
 progress:
-  total_phases: 5
+  total_phases: 6
   completed_phases: 4
   total_plans: 13
   completed_plans: 10
@@ -67,6 +67,10 @@ Recent decisions affecting current work:
 - Launch free-only — Stripe billing deferred to post-launch milestone
 - structlog as only new dependency for observability — Phase 6
 
+### Roadmap Evolution
+
+- Phase 07.1 inserted after Phase 07: multi-office-ux — Places autocomplete install, always-prompt per-channel office binding, admin UX (URGENT — blocks Phase 08 marketplace submission; raw GPS entry on install page is not ship-ready)
+
 ### Pending Todos
 
 None yet.
@@ -88,6 +92,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-04-15T16:22:11.067Z
-Stopped at: Phase 8 planned (3 plans, verified)
-Resume file: .planning/phases/08-marketplace-submission/08-01-PLAN.md
+Last session: 2026-04-15T18:13:12.998Z
+Stopped at: Phase 07.1 context gathered (discuss mode)
+Resume file: .planning/phases/07.1-multi-office-ux-places-autocomplete-install-always-prompt-pe/07.1-CONTEXT.md
