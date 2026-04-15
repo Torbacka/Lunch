@@ -13,10 +13,17 @@ from lunchbot.client import places_client, db_client
 from lunchbot.client.workspace_client import (
     get_workspace, get_workspace_settings, update_workspace_settings,
     bind_channel_location, resolve_location_for_channel,
+    create_workspace_location, list_workspace_locations,
 )
 from lunchbot.client import slack_client
 from lunchbot.services import vote_service, poll_service
-from lunchbot.blueprints.polls import CHANNEL_LOC_USE_DEFAULT, CHANNEL_LOC_PICK
+from lunchbot.blueprints.polls import (
+    CHANNEL_LOC_USE_DEFAULT, CHANNEL_LOC_PICK, CHANNEL_LOC_ADD_OFFICE,
+)
+from lunchbot.services.office_modal_service import (
+    build_add_office_modal, CALLBACK_ADD_OFFICE, OFFICE_SEARCH_SELECT,
+    OFFICE_SEARCH_BLOCK,
+)
 from lunchbot.services.app_home_service import (
     build_home_view, build_channel_modal, build_schedule_modal,
     build_poll_size_modal, build_location_modal, build_remove_schedule_modal,
@@ -99,6 +106,13 @@ def _handle_block_actions(payload):
     # Channel-location first-use binding actions
     if action_id in (CHANNEL_LOC_USE_DEFAULT, CHANNEL_LOC_PICK):
         return _handle_channel_location_bind(action_id, payload, first_action)
+
+    # Add-office button opens the places-backed modal
+    if action_id == CHANNEL_LOC_ADD_OFFICE:
+        channel_id = payload.get('channel', {}).get('id', '')
+        modal = build_add_office_modal(team_id, channel_id=channel_id)
+        slack_client.views_open(trigger_id, modal, team_id)
+        return '', 200
 
     # Legacy: existing vote/suggest handling
     return _handle_legacy_action(payload, first_action)
@@ -282,6 +296,48 @@ def _handle_view_submission(payload):
         _refresh_app_home(user_id, team_id)
         return '', 200
 
+    if callback_id == CALLBACK_ADD_OFFICE:
+        channel_id = private_metadata.get('channel_id')
+        place_id = _extract_value(
+            values, OFFICE_SEARCH_SELECT, 'selected_option', key='value',
+        )
+        if not place_id:
+            return jsonify({
+                'response_action': 'errors',
+                'errors': {OFFICE_SEARCH_BLOCK: 'Pick an address from the search results.'},
+            })
+        details = places_client.get_place_details(place_id)
+        result = (details or {}).get('result') or {}
+        loc = (result.get('geometry') or {}).get('location') or {}
+        if 'lat' not in loc or 'lng' not in loc:
+            return jsonify({
+                'response_action': 'errors',
+                'errors': {OFFICE_SEARCH_BLOCK: 'Could not resolve that address. Try another.'},
+            })
+        name = result.get('name') or 'Office'
+        formatted = result.get('formatted_address') or ''
+        short = formatted.split(',', 1)[0].strip() if formatted else ''
+        office_name = f'{name}, {short}' if short and short.lower() != name.lower() else name
+        lat_lng = f"{loc['lat']},{loc['lng']}"
+
+        existing = list_workspace_locations(team_id) or []
+        is_first = len(existing) == 0
+        row = create_workspace_location(team_id, office_name, lat_lng, is_default=is_first)
+        via = 'lunch_prompt' if channel_id else 'app_home'
+        logger.info(
+            'office_create',
+            team_id=team_id, location_id=row['id'],
+            actor_user_id=user_id, via=via,
+        )
+
+        if channel_id:
+            bind_channel_location(team_id, channel_id, row['id'])
+            try:
+                poll_service.push_poll(channel_id, team_id, trigger_source='add_office_modal')
+            except ValueError as e:
+                logger.warning('push_poll_after_add_office_failed', error=str(e))
+        return '', 200
+
     return '', 200
 
 
@@ -321,6 +377,20 @@ def find_suggestions():
     payload = json.loads(request.form.get('payload', '{}'))
     search_value = payload.get('value', '')
     logger.info('suggestion_search', search_value=search_value)
+
+    # Office search (Add-office modal) is a Places Autocomplete proxy and does
+    # NOT depend on a bound channel.
+    action_id = payload.get('action_id', '')
+    if action_id == OFFICE_SEARCH_SELECT:
+        token = places_client.new_session_token()
+        data = places_client.autocomplete(search_value, session_token=token) if search_value else {}
+        options = []
+        for p in (data.get('predictions') or [])[:20]:
+            options.append({
+                'text': {'type': 'plain_text', 'text': (p.get('description') or '')[:75]},
+                'value': p.get('place_id'),
+            })
+        return jsonify({'options': options})
 
     # Resolve location via the channel binding (not the deprecated
     # workspaces.location column). The external_select payload carries the
