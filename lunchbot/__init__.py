@@ -142,4 +142,7 @@ def create_app(config_name='dev'):
     from lunchbot.blueprints.web import bp as web_bp
     app.register_blueprint(web_bp)
 
+    from lunchbot.blueprints.places_proxy import bp as places_proxy_bp
+    app.register_blueprint(places_proxy_bp)
+
     return app
