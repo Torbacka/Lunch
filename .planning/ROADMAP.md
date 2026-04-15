@@ -149,6 +149,21 @@ Plans:
 Plans:
 - [ ] 07-01: TBD
 
+### Phase 07.1: multi-office-ux: Places autocomplete install, always-prompt per-channel office binding, admin UX (INSERTED)
+
+**Goal:** Make multi-office a first-class, end-to-end feature: Places-autocomplete install flow, always-prompt per-channel office binding (with self-service Add office), App Home Offices admin UX, and full retirement of the legacy workspaces.location column.
+**Requirements**: D-01 through D-25 (CONTEXT.md decisions; no formal REQUIREMENTS.md IDs allocated)
+**Depends on:** Phase 07
+**Plans:** 6 plans
+
+Plans:
+- [ ] 07.1-01-PLAN.md -- places_client autocomplete + /places proxy endpoint (server-side key handling)
+- [ ] 07.1-02-PLAN.md -- workspace_client: rename/delete/set_default helpers + remove auto-bind fallback + drop location reads
+- [ ] 07.1-03-PLAN.md -- Alembic migration 008: backfill + drop workspaces.location column
+- [ ] 07.1-04-PLAN.md -- /slack/setup install flow rewrite: Places autocomplete + workspace_locations creation
+- [ ] 07.1-05-PLAN.md -- Always-prompt /lunch flow + Add-office Slack modal (non-admin allowed)
+- [ ] 07.1-06-PLAN.md -- App Home Offices section + admin gating (rename/delete/set default/add)
+
 ### Phase 8: Marketplace Submission
 **Goal**: LunchBot passes Slack App Directory review and is listed for public installation
 **Depends on**: Phase 5, Phase 6, Phase 7 (all features complete, observability active, web presence live)
