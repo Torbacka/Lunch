@@ -146,6 +146,28 @@ def views_publish(user_id, view, team_id):
     return resp_json
 
 
+def is_workspace_admin(user_id, team_id):
+    """Return True iff the Slack user is an admin or owner of the workspace.
+
+    Returns False on any error (least-privilege default — T-07.1-26).
+    """
+    try:
+        token = get_bot_token(team_id)
+        response = session.get(
+            SLACK_API + "users.info",
+            headers=_headers(token),
+            params={'user': user_id},
+        )
+        data = response.json()
+        if not data.get('ok'):
+            return False
+        u = data.get('user') or {}
+        return bool(u.get('is_admin') or u.get('is_owner'))
+    except Exception:
+        logger.exception('is_workspace_admin failed for user=%s', user_id)
+        return False
+
+
 def views_open(trigger_id, view, team_id):
     """Open a modal view.
 

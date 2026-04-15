@@ -71,13 +71,14 @@ class TestBuildHomeViewStateB:
     def test_state_b_shows_edit_buttons(self):
         from lunchbot.services.app_home_service import (
             build_home_view, ACTION_EDIT_CHANNEL, ACTION_EDIT_SCHEDULE,
-            ACTION_EDIT_POLL_SIZE, ACTION_EDIT_LOCATION,
+            ACTION_EDIT_POLL_SIZE, ACTION_ADD_OFFICE_FROM_HOME,
         )
         view = build_home_view(self._settings())
         blocks_text = json.dumps(view['blocks'])
         assert ACTION_EDIT_CHANNEL in blocks_text
         assert ACTION_EDIT_POLL_SIZE in blocks_text
-        assert ACTION_EDIT_LOCATION in blocks_text
+        # Phase 07.1 Plan 06: legacy Location row replaced by Offices section
+        assert ACTION_ADD_OFFICE_FROM_HOME in blocks_text
 
     def test_state_b_no_schedule_shows_message(self):
         from lunchbot.services.app_home_service import build_home_view
@@ -117,11 +118,17 @@ class TestBuildHomeViewStateB:
         from lunchbot.services.app_home_service import build_home_view
         view = build_home_view(self._settings(), is_admin=False)
         blocks_text = json.dumps(view['blocks'])
-        # No edit buttons
-        assert 'app_home_edit' not in blocks_text
-        # No actions blocks
+        # No admin edit buttons for channel / schedule / poll_size / office mutations
+        assert 'app_home_edit_channel' not in blocks_text
+        assert 'app_home_edit_schedule' not in blocks_text
+        assert 'app_home_edit_poll_size' not in blocks_text
+        assert 'app_home_rename_office' not in blocks_text
+        assert 'app_home_delete_office' not in blocks_text
+        assert 'app_home_set_default_office' not in blocks_text
+        # The only actions block allowed for non-admins is the Offices "Add office" button
         action_blocks = [b for b in view['blocks'] if b.get('type') == 'actions']
-        assert len(action_blocks) == 0
+        assert len(action_blocks) == 1
+        assert action_blocks[0]['elements'][0]['action_id'] == 'app_home_add_office'
         # Shows non-admin notice
         assert 'Contact a workspace admin' in blocks_text
 
@@ -133,17 +140,20 @@ class TestBuildHomeViewStateB:
         assert '2 smart picks' in blocks_text
         assert '3 random' in blocks_text
 
-    def test_state_b_location_display(self):
+    def test_state_b_offices_section_rendered(self):
+        # Phase 07.1 Plan 06: single Location row replaced by Offices section.
         from lunchbot.services.app_home_service import build_home_view
-        view = build_home_view(self._settings())
+        locs = [{'id': 1, 'name': 'HQ', 'lat_lng': '59,18', 'is_default': True}]
+        view = build_home_view(self._settings(), locations=locs)
         blocks_text = json.dumps(view['blocks'])
-        assert 'Stockholm, Sweden' in blocks_text
+        assert 'Offices' in blocks_text
+        assert 'HQ' in blocks_text
 
-    def test_state_b_no_location(self):
+    def test_state_b_offices_section_empty_state(self):
         from lunchbot.services.app_home_service import build_home_view
-        view = build_home_view(self._settings(location=None))
+        view = build_home_view(self._settings(), locations=[])
         blocks_text = json.dumps(view['blocks'])
-        assert 'Not set' in blocks_text
+        assert 'No offices yet' in blocks_text
 
 
 class TestBuildChannelModal:
@@ -208,18 +218,9 @@ class TestBuildPollSizeModal:
         assert 'Smart picks use your team' in blocks_text
 
 
-class TestBuildLocationModal:
-    def test_location_modal_structure(self):
-        from lunchbot.services.app_home_service import build_location_modal, CALLBACK_LOCATION
-        modal = build_location_modal(team_id='T123')
-        assert modal['type'] == 'modal'
-        assert modal['callback_id'] == CALLBACK_LOCATION
-        assert modal['title']['text'] == 'Search Location'
-        assert modal['submit']['text'] == 'Save Location'
-        assert modal['close']['text'] == 'Keep Current Location'
-        blocks_text = json.dumps(modal['blocks'])
-        assert 'plain_text_input' in blocks_text
-        assert 'Stockholm, Sweden' in blocks_text
+# TestBuildLocationModal removed in Phase 07.1 Plan 06 — legacy single-location
+# modal replaced by Offices section (rename/delete/add-office modals tested in
+# tests/test_app_home_offices.py and tests/test_always_prompt_and_add_office.py).
 
 
 class TestBuildRemoveScheduleModal:

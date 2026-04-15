@@ -12,7 +12,9 @@ app_home_opened builds and publishes the App Home view (T-05-06: admin gating).
 import logging
 from flask import Blueprint, request, jsonify
 
-from lunchbot.client.workspace_client import deactivate_workspace, get_workspace_settings
+from lunchbot.client.workspace_client import (
+    deactivate_workspace, get_workspace_settings, list_workspace_locations,
+)
 from lunchbot.client import slack_client
 from lunchbot.services.app_home_service import build_home_view
 
@@ -65,9 +67,12 @@ def events():
     if event_type == 'app_home_opened':
         user_id = event.get('user')
         if team_id and user_id:
-            is_admin = _is_workspace_admin(user_id, team_id)
+            is_admin = slack_client.is_workspace_admin(user_id, team_id)
             settings = get_workspace_settings(team_id)
-            view = build_home_view(settings, is_admin=is_admin)
+            locations = list_workspace_locations(team_id) or []
+            view = build_home_view(
+                settings, is_admin=is_admin, locations=locations,
+            )
             slack_client.views_publish(user_id, view, team_id)
             logger.info('Published App Home for user %s in workspace %s (admin=%s)',
                         user_id, team_id, is_admin)

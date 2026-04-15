@@ -14,6 +14,8 @@ from lunchbot.client.workspace_client import (
     get_workspace, get_workspace_settings, update_workspace_settings,
     bind_channel_location, resolve_location_for_channel,
     create_workspace_location, list_workspace_locations,
+    rename_workspace_location, delete_workspace_location,
+    set_default_workspace_location,
 )
 from lunchbot.client import slack_client
 from lunchbot.services import vote_service, poll_service
@@ -26,11 +28,15 @@ from lunchbot.services.office_modal_service import (
 )
 from lunchbot.services.app_home_service import (
     build_home_view, build_channel_modal, build_schedule_modal,
-    build_poll_size_modal, build_location_modal, build_remove_schedule_modal,
+    build_poll_size_modal, build_remove_schedule_modal,
+    build_rename_office_modal, build_delete_office_modal,
     ACTION_BEGIN_SETUP, ACTION_EDIT_CHANNEL, ACTION_EDIT_SCHEDULE,
-    ACTION_EDIT_POLL_SIZE, ACTION_EDIT_LOCATION, ACTION_REMOVE_SCHEDULE,
+    ACTION_EDIT_POLL_SIZE, ACTION_REMOVE_SCHEDULE,
+    ACTION_ADD_OFFICE_FROM_HOME, ACTION_RENAME_OFFICE,
+    ACTION_SET_DEFAULT_OFFICE, ACTION_DELETE_OFFICE,
     CALLBACK_CHANNEL, CALLBACK_SCHEDULE, CALLBACK_POLL_SIZE,
-    CALLBACK_LOCATION, CALLBACK_REMOVE_SCHEDULE,
+    CALLBACK_REMOVE_SCHEDULE,
+    CALLBACK_RENAME_OFFICE, CALLBACK_DELETE_OFFICE,
 )
 from lunchbot.services.scheduler_service import update_schedule_job, remove_schedule_job
 
@@ -41,7 +47,9 @@ bp = Blueprint('slack_actions', __name__)
 # App Home action IDs for dispatch
 _APP_HOME_ACTIONS = frozenset({
     ACTION_BEGIN_SETUP, ACTION_EDIT_CHANNEL, ACTION_EDIT_SCHEDULE,
-    ACTION_EDIT_POLL_SIZE, ACTION_EDIT_LOCATION, ACTION_REMOVE_SCHEDULE,
+    ACTION_EDIT_POLL_SIZE, ACTION_REMOVE_SCHEDULE,
+    ACTION_ADD_OFFICE_FROM_HOME, ACTION_RENAME_OFFICE,
+    ACTION_SET_DEFAULT_OFFICE, ACTION_DELETE_OFFICE,
 })
 
 
@@ -101,7 +109,10 @@ def _handle_block_actions(payload):
 
     # App Home button actions
     if action_id in _APP_HOME_ACTIONS:
-        return _handle_app_home_action(action_id, team_id, trigger_id)
+        user_id = payload.get('user', {}).get('id')
+        return _handle_app_home_action(
+            action_id, team_id, trigger_id, user_id, first_action,
+        )
 
     # Channel-location first-use binding actions
     if action_id in (CHANNEL_LOC_USE_DEFAULT, CHANNEL_LOC_PICK):
@@ -144,7 +155,7 @@ def _handle_channel_location_bind(action_id, payload, first_action):
     return '', 200
 
 
-def _handle_app_home_action(action_id, team_id, trigger_id):
+def _handle_app_home_action(action_id, team_id, trigger_id, user_id=None, first_action=None):
     """Handle App Home button clicks by opening the appropriate modal."""
     if action_id in (ACTION_BEGIN_SETUP, ACTION_EDIT_CHANNEL):
         settings = get_workspace_settings(team_id)
@@ -176,19 +187,49 @@ def _handle_app_home_action(action_id, team_id, trigger_id):
         slack_client.views_open(trigger_id, modal, team_id)
         return '', 200
 
-    if action_id == ACTION_EDIT_LOCATION:
-        settings = get_workspace_settings(team_id)
-        modal = build_location_modal(
-            current_location=settings.get('location') if settings else None,
-            team_id=team_id,
-        )
-        slack_client.views_open(trigger_id, modal, team_id)
-        return '', 200
-
     if action_id == ACTION_REMOVE_SCHEDULE:
         modal = build_remove_schedule_modal(team_id=team_id)
         slack_client.views_open(trigger_id, modal, team_id)
         return '', 200
+
+    if action_id == ACTION_ADD_OFFICE_FROM_HOME:
+        # No admin gate — non-admins are allowed to add offices (D-07/D-15).
+        modal = build_add_office_modal(team_id, channel_id=None)
+        slack_client.views_open(trigger_id, modal, team_id)
+        return '', 200
+
+    if action_id in (
+        ACTION_RENAME_OFFICE, ACTION_SET_DEFAULT_OFFICE, ACTION_DELETE_OFFICE,
+    ):
+        if not slack_client.is_workspace_admin(user_id, team_id):
+            logger.warning(
+                'app_home_admin_gate_blocked',
+                team_id=team_id, user_id=user_id, action_id=action_id,
+            )
+            return '', 200
+        try:
+            location_id = int((first_action or {}).get('value', ''))
+        except (TypeError, ValueError):
+            return '', 200
+        rows = list_workspace_locations(team_id) or []
+        target = next((r for r in rows if r['id'] == location_id), None)
+        if target is None:
+            return '', 200
+
+        if action_id == ACTION_RENAME_OFFICE:
+            modal = build_rename_office_modal(team_id, location_id, target['name'])
+            slack_client.views_open(trigger_id, modal, team_id)
+            return '', 200
+
+        if action_id == ACTION_DELETE_OFFICE:
+            modal = build_delete_office_modal(team_id, location_id, target['name'])
+            slack_client.views_open(trigger_id, modal, team_id)
+            return '', 200
+
+        if action_id == ACTION_SET_DEFAULT_OFFICE:
+            set_default_workspace_location(team_id, location_id, user_id)
+            _refresh_app_home(user_id, team_id)
+            return '', 200
 
     return '', 200
 
@@ -274,14 +315,33 @@ def _handle_view_submission(payload):
         _refresh_app_home(user_id, team_id)
         return '', 200
 
-    if callback_id == CALLBACK_LOCATION:
-        loc = _extract_value(values, 'location_input', 'value')
-        if not loc or not loc.strip():
+    if callback_id == CALLBACK_RENAME_OFFICE:
+        if not slack_client.is_workspace_admin(user_id, team_id):
             return jsonify({
                 'response_action': 'errors',
-                'errors': {'location_input_block': 'Location must not be empty.'}
+                'errors': {
+                    'office_name_block': 'Only workspace admins can rename offices.',
+                },
             })
-        update_workspace_settings(team_id, location=loc.strip())
+        location_id = private_metadata.get('location_id')
+        new_name = _extract_value(values, 'office_name_input', 'value')
+        if not new_name or not new_name.strip():
+            return jsonify({
+                'response_action': 'errors',
+                'errors': {'office_name_block': 'Name must not be empty.'},
+            })
+        rename_workspace_location(
+            team_id, int(location_id), new_name.strip(), user_id,
+        )
+        _refresh_app_home(user_id, team_id)
+        return '', 200
+
+    if callback_id == CALLBACK_DELETE_OFFICE:
+        if not slack_client.is_workspace_admin(user_id, team_id):
+            # Silent close on non-admin attempts (defense in depth).
+            return jsonify({'response_action': 'errors', 'errors': {}})
+        location_id = private_metadata.get('location_id')
+        delete_workspace_location(team_id, int(location_id), user_id)
         _refresh_app_home(user_id, team_id)
         return '', 200
 
@@ -336,6 +396,8 @@ def _handle_view_submission(payload):
                 poll_service.push_poll(channel_id, team_id, trigger_source='add_office_modal')
             except ValueError as e:
                 logger.warning('push_poll_after_add_office_failed', error=str(e))
+        else:
+            _refresh_app_home(user_id, team_id)
         return '', 200
 
     return '', 200
@@ -361,7 +423,9 @@ def _refresh_app_home(user_id, team_id):
     if not user_id or not team_id:
         return
     settings = get_workspace_settings(team_id)
-    view = build_home_view(settings, is_admin=True)  # Only admins can submit modals
+    locations = list_workspace_locations(team_id) or []
+    is_admin = slack_client.is_workspace_admin(user_id, team_id)
+    view = build_home_view(settings, is_admin=is_admin, locations=locations)
     slack_client.views_publish(user_id, view, team_id)
 
 
