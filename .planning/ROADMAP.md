@@ -159,11 +159,12 @@ Plans:
   3. App icon, directory screenshots, and YouTube demo video meet Slack's format requirements
   4. Bot is installed on 5+ active workspaces via beta rollout
   5. App is submitted to Slack App Directory and review process is initiated
-**Plans**: TBD
+**Plans**: 3 plans
 
 Plans:
-- [ ] 08-01: TBD
-- [ ] 08-02: TBD
+- [ ] 08-01-PLAN.md -- OAuth CSRF state hardening (MKT-01) + scope justification doc (MKT-02)
+- [ ] 08-02-PLAN.md -- Marketplace assets (icon, screenshots, demo video) + support@ alias setup (MKT-03/04/05, D-18)
+- [ ] 08-03-PLAN.md -- Beta rollout + submission gate script + App Directory submission (MKT-06/07)
 
 ## Progress
 
