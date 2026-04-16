@@ -1,10 +1,11 @@
-"""Per-workspace poll scheduler using APScheduler.
+"""Per-channel poll scheduler using APScheduler.
 
 Per D-06: in-process BackgroundScheduler, no separate container.
-Per D-07: schedules loaded from workspaces table at startup, not APScheduler jobstore.
+Per D-07: schedules loaded from channel_schedules table at startup, not APScheduler jobstore.
 Per D-08: initialized in create_app alongside connection pool.
+Per D-13: jobs keyed on (team_id, channel_id), sourced from channel_schedules table.
 
-Job naming: "poll_{team_id}" per workspace.
+Job naming: "poll_{team_id}_{channel_id}" per channel schedule.
 """
 import structlog
 from apscheduler.schedulers.background import BackgroundScheduler
@@ -21,6 +22,11 @@ WEEKDAY_MAP = {
     'Mon': 'mon', 'Tue': 'tue', 'Wed': 'wed',
     'Thu': 'thu', 'Fri': 'fri', 'Sat': 'sat', 'Sun': 'sun'
 }
+
+
+def _job_name(team_id, channel_id):
+    """Build a deterministic APScheduler job id for a channel schedule."""
+    return "poll_{}_{}".format(team_id, channel_id)
 
 
 def init_scheduler(app):
@@ -44,82 +50,53 @@ def init_scheduler(app):
 
 
 def load_all_schedules():
-    """Load all workspace schedules from DB and create cron jobs.
+    """Load all channel schedules from DB and create cron jobs.
 
-    Per D-07: reads from workspaces table, not APScheduler jobstore.
+    Per D-13: reads from channel_schedules table, one job per (team_id, channel_id).
     Called at startup and can be called to refresh.
     """
     from lunchbot.db import get_pool
     from psycopg.rows import dict_row
 
+    # Get all active workspace team_ids
     with get_pool().connection() as conn:
         with conn.cursor(row_factory=dict_row) as cur:
             cur.execute("""
-                SELECT team_id, poll_channel, poll_schedule_time,
-                       poll_schedule_timezone, poll_schedule_weekdays
-                FROM workspaces
-                WHERE is_active = TRUE AND poll_schedule_time IS NOT NULL
+                SELECT team_id FROM workspaces WHERE is_active = TRUE
             """)
-            rows = cur.fetchall()
+            teams = cur.fetchall()
 
     count = 0
-    for row in rows:
-        _add_job(
-            team_id=row['team_id'],
-            channel=row.get('poll_channel'),
-            hour=row['poll_schedule_time'].hour,
-            minute=row['poll_schedule_time'].minute,
-            timezone=row.get('poll_schedule_timezone', 'UTC'),
-            weekdays=row.get('poll_schedule_weekdays') or ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'],
-        )
-        count += 1
+    for team_row in teams:
+        team_id = team_row['team_id']
+        from lunchbot.client.db_client import list_channel_schedules
+        schedules = list_channel_schedules(team_id)
+        for sched in schedules:
+            _ensure_job(
+                team_id=team_id,
+                channel_id=sched['channel_id'],
+                schedule_time=sched['schedule_time'],
+                timezone=sched.get('schedule_timezone', 'UTC'),
+                weekdays=sched.get('schedule_weekdays', 'Mon,Tue,Wed,Thu,Fri'),
+            )
+            count += 1
     logger.info('schedules_loaded', count=count)
 
 
-def update_schedule_job(team_id, time_val, timezone, weekdays, channel=None):
-    """Add or replace a workspace's cron job.
+def _ensure_job(team_id, channel_id, schedule_time, timezone, weekdays):
+    """Internal: add a cron job to the scheduler for a channel schedule."""
+    job_id = _job_name(team_id, channel_id)
 
-    Args:
-        team_id: Slack team ID
-        time_val: datetime.time object (hour, minute)
-        timezone: IANA timezone string (e.g. 'Europe/Stockholm')
-        weekdays: list of weekday strings (e.g. ['Mon', 'Tue', 'Wed'])
-        channel: Slack channel ID (if None, poll_channel_for resolves it)
-    """
-    job_id = f'poll_{team_id}'
-    # Remove existing job if any
-    if _scheduler.get_job(job_id):
-        _scheduler.remove_job(job_id)
-
-    _add_job(
-        team_id=team_id,
-        channel=channel,
-        hour=time_val.hour,
-        minute=time_val.minute,
-        timezone=timezone,
-        weekdays=weekdays,
-    )
-    logger.info('schedule_updated', job_id=job_id, hour=time_val.hour, minute=time_val.minute, timezone=timezone, weekdays=weekdays)
-
-
-def remove_schedule_job(team_id):
-    """Remove a workspace's cron job. No-op if job doesn't exist."""
-    job_id = f'poll_{team_id}'
-    if _scheduler and _scheduler.get_job(job_id):
-        _scheduler.remove_job(job_id)
-        logger.info('schedule_removed', job_id=job_id)
+    # Parse weekdays (comma-separated string or list)
+    if isinstance(weekdays, str):
+        day_list = [d.strip() for d in weekdays.split(',')]
     else:
-        logger.debug('schedule_remove_noop', job_id=job_id)
-
-
-def _add_job(team_id, channel, hour, minute, timezone, weekdays):
-    """Internal: add a cron job to the scheduler."""
-    job_id = f'poll_{team_id}'
-    day_of_week = ','.join(WEEKDAY_MAP.get(d, d.lower()[:3]) for d in weekdays)
+        day_list = weekdays
+    day_of_week = ','.join(WEEKDAY_MAP.get(d, d.lower()[:3]) for d in day_list)
 
     trigger = CronTrigger(
-        hour=hour,
-        minute=minute,
+        hour=schedule_time.hour,
+        minute=schedule_time.minute,
         day_of_week=day_of_week,
         timezone=timezone,
     )
@@ -128,15 +105,51 @@ def _add_job(team_id, channel, hour, minute, timezone, weekdays):
         _run_poll,
         trigger=trigger,
         id=job_id,
-        args=[team_id, channel],
+        args=[team_id, channel_id],
         replace_existing=True,
     )
 
 
-def _run_poll(team_id, channel):
-    """Job target: post a poll for a workspace inside an app context.
+def update_schedule_job(team_id, channel_id, time_val, timezone, weekdays):
+    """Add or replace a channel's cron job.
 
-    Resolves channel from DB if not provided at job creation time.
+    Args:
+        team_id: Slack team ID
+        channel_id: Slack channel ID
+        time_val: datetime.time object (hour, minute)
+        timezone: IANA timezone string (e.g. 'Europe/Stockholm')
+        weekdays: comma-separated weekday string (e.g. 'Mon,Tue,Wed')
+    """
+    job_id = _job_name(team_id, channel_id)
+    # Remove existing job if any
+    if _scheduler.get_job(job_id):
+        _scheduler.remove_job(job_id)
+
+    _ensure_job(
+        team_id=team_id,
+        channel_id=channel_id,
+        schedule_time=time_val,
+        timezone=timezone,
+        weekdays=weekdays,
+    )
+    logger.info('schedule_updated', job_id=job_id, hour=time_val.hour,
+                minute=time_val.minute, timezone=timezone, weekdays=weekdays)
+
+
+def remove_schedule_job(team_id, channel_id):
+    """Remove a channel's cron job. No-op if job doesn't exist."""
+    job_id = _job_name(team_id, channel_id)
+    try:
+        _scheduler.remove_job(job_id)
+        logger.info('schedule_removed', job_id=job_id)
+    except Exception:
+        pass
+
+
+def _run_poll(team_id, channel_id):
+    """Job target: post a poll for a channel inside an app context.
+
+    Per D-13: channel_id is always provided, no fallback resolution.
     T-05-03: g.workspace_id set to team_id the job was created for,
     not from external input at execution time.
     """
@@ -145,16 +158,12 @@ def _run_poll(team_id, channel):
         return
     with _app.app_context():
         from flask import g
-        from lunchbot.services.poll_service import push_poll, poll_channel_for
+        from lunchbot.services.poll_service import push_poll
         g.workspace_id = team_id
-        resolved_channel = channel or poll_channel_for(team_id)
-        if not resolved_channel:
-            logger.warning('poll_channel_missing', team_id=team_id)
-            return
         try:
             import time as _time
-            push_poll(resolved_channel, team_id, trigger_source='scheduled')
-            logger.info('scheduled_poll_posted', team_id=team_id, channel=resolved_channel)
+            push_poll(channel_id, team_id, trigger_source='scheduled')
+            logger.info('scheduled_poll_posted', team_id=team_id, channel=channel_id)
             try:
                 _app.extensions['prom_scheduler_success'].labels(workspace_id=team_id).inc()
                 _app.extensions['prom_scheduler_last_run'].labels(workspace_id=team_id).set(_time.time())
