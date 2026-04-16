@@ -189,7 +189,7 @@ Plans:
 - [x] 07.2-06-PLAN.md -- App Home per-channel schedule list + Schedule-a-channel modal + list_bot_channels wrapper
 - [x] 07.2-07-PLAN.md -- Regression test suite (G-01 isolation, G-02 divergence, migration 009 invariants, scheduler, App Home, channel picker)
 - [x] 07.2-08-PLAN.md -- [BLOCKING] alembic upgrade head + full test suite on migrated DB
-- [ ] 07.2-09-PLAN.md -- [GAP CLOSURE] Fix save_restaurants missing location_id + wire seed_service in add-office modal + update test
+- [x] 07.2-09-PLAN.md -- [GAP CLOSURE] Fix save_restaurants missing location_id + wire seed_service in add-office modal + update test
 
 ### Phase 8: Marketplace Submission
 **Goal**: LunchBot passes Slack App Directory review and is listed for public installation
