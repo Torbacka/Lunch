@@ -163,8 +163,8 @@ def test_ensure_poll_options_called_from_push_poll(app_context, monkeypatch):
     from lunchbot.services import poll_service
 
     calls = []
-    def mock_ensure(poll_date=None, workspace_id=None):
-        calls.append({'poll_date': poll_date, 'workspace_id': workspace_id})
+    def mock_ensure(poll_date=None, workspace_id=None, channel_id=None):
+        calls.append({'poll_date': poll_date, 'workspace_id': workspace_id, 'channel_id': channel_id})
         return 0
 
     with patch('lunchbot.services.poll_service.ensure_poll_options', mock_ensure):
@@ -176,3 +176,5 @@ def test_ensure_poll_options_called_from_push_poll(app_context, monkeypatch):
     assert len(calls) == 1
     from datetime import date
     assert calls[0]['poll_date'] == date.today()
+    assert calls[0]['workspace_id'] == 'T_TEST'
+    assert calls[0]['channel_id'] == '#lunch'

@@ -217,7 +217,7 @@ def push_poll(channel, team_id, trigger_source='manual'):
         Slack API response dict
     """
     logger.info('poll_building', channel=channel, team_id=team_id, trigger_source=trigger_source)
-    ensure_poll_options(poll_date=date.today())
+    ensure_poll_options(poll_date=date.today(), workspace_id=team_id, channel_id=channel)
     options = db_client.get_votes(date.today())
     logger.info('poll_posting', channel=channel, team_id=team_id, restaurant_count=len(options), trigger_source=trigger_source)
     blocks = build_poll_blocks(options)

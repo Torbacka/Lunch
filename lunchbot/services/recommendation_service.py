@@ -83,12 +83,12 @@ def update_stats_lazy(today=None):
     Per D-06: alpha += votes_received, beta += (total_voters - votes_received).
     Pitfall 1: skip polls with zero voters.
     Pitfall 4: handles missing days gracefully.
+    Per 07.2: keys stats on (channel_id, restaurant_id) with team_id from poll row.
 
     Args:
         today: date to use as "today" (default: date.today()). Polls before this date are processed.
     """
     today = today or date.today()
-    workspace_id = getattr(g, 'workspace_id', None)
 
     unprocessed = db_client.get_unprocessed_polls(today)
     if not unprocessed:
@@ -96,6 +96,14 @@ def update_stats_lazy(today=None):
         return
 
     for poll in unprocessed:
+        channel_id = poll.get('slack_channel_id')
+        workspace_id = poll['workspace_id']
+
+        if not channel_id:
+            logger.warning('poll %s has no slack_channel_id, skipping stats update', poll['id'])
+            db_client.mark_poll_stats_processed(poll['id'])
+            continue
+
         vote_shares = db_client.get_poll_vote_shares(poll['id'])
         if not vote_shares:
             # Pitfall 1: nobody voted, just mark processed
@@ -108,27 +116,29 @@ def update_stats_lazy(today=None):
             alpha_inc = vs['votes_received']
             beta_inc = total_voters - vs['votes_received']
             db_client.update_restaurant_stats(
+                channel_id,
                 vs['restaurant_id'],
-                alpha_increment=alpha_inc,
-                beta_increment=beta_inc,
-                workspace_id=workspace_id,
+                alpha_inc,
+                beta_inc,
+                workspace_id,
             )
             logger.debug(
-                'Updated stats for restaurant %s: alpha+=%s, beta+=%s',
-                vs['restaurant_id'], alpha_inc, beta_inc
+                'Updated stats for restaurant %s (channel %s): alpha+=%s, beta+=%s',
+                vs['restaurant_id'], channel_id, alpha_inc, beta_inc
             )
 
         db_client.mark_poll_stats_processed(poll['id'])
         logger.info('Processed stats for poll %s (date=%s)', poll['id'], poll['poll_date'])
 
 
-def ensure_poll_options(poll_date=None, workspace_id=None):
+def ensure_poll_options(poll_date, workspace_id, channel_id):
     """Fill today's poll to POLL_SIZE using smart picks + random fill.
 
     Per D-01: manual additions are always preserved.
     Per D-02: fills remaining slots with smart + random.
     Per D-03: if poll empty, auto-generate all options.
     Per D-04: triggered inline by push_poll.
+    Per 07.2: channel_id threaded to get_candidate_pool and upsert_suggestion.
 
     Pipeline:
     1. Update stats from unprocessed polls (lazy, D-08)
@@ -139,8 +149,9 @@ def ensure_poll_options(poll_date=None, workspace_id=None):
     6. Add all picks via upsert_suggestion
 
     Args:
-        poll_date: date for the poll (default: today)
-        workspace_id: workspace ID (default: from g.workspace_id)
+        poll_date: date for the poll
+        workspace_id: workspace ID
+        channel_id: Slack channel ID for per-channel scoping
 
     Returns:
         Number of options added
@@ -169,7 +180,7 @@ def ensure_poll_options(poll_date=None, workspace_id=None):
         return 0
 
     # Step 3: Get candidate pool
-    candidates = db_client.get_candidate_pool(poll_date)
+    candidates = db_client.get_candidate_pool(poll_date, channel_id)
     if not candidates:
         logger.warning('No candidates available for auto-fill')
         return 0
@@ -195,7 +206,7 @@ def ensure_poll_options(poll_date=None, workspace_id=None):
             cuisine = classify_cuisine(pick.get('types'), pick.get('name', ''))
             walking_mins = _compute_walking_minutes(pick, origin_lat, origin_lon)
             db_client.upsert_suggestion(
-                poll_date, pick['restaurant_id'], workspace_id,
+                poll_date, pick['restaurant_id'], workspace_id, channel_id,
                 pick_type=pick_type,
                 cuisine=cuisine,
                 walking_minutes=walking_mins,
