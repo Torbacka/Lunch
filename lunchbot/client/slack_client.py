@@ -168,6 +168,47 @@ def is_workspace_admin(user_id, team_id):
         return False
 
 
+def list_bot_channels(team_id, cursor=None):
+    """List channels the bot is a member of.
+
+    Uses the users.conversations endpoint which returns only channels the
+    caller (bot) has joined — satisfying D-16 (bot-member channels only,
+    no extra filtering needed).
+
+    Args:
+        team_id: Slack team ID for workspace token resolution
+        cursor: pagination cursor from a previous call, or None
+
+    Returns:
+        Tuple (channels, next_cursor) where channels is a list of dicts
+        each containing at minimum 'id' and 'name', and next_cursor is
+        the pagination cursor string or None when exhausted.
+    """
+    token = get_bot_token(team_id)
+    params = {
+        'types': 'public_channel,private_channel',
+        'exclude_archived': 'true',
+        'limit': '200',
+    }
+    if cursor:
+        params['cursor'] = cursor
+    response = session.get(
+        SLACK_API + "users.conversations",
+        headers=_headers(token),
+        params=params,
+    )
+    data = response.json()
+    if not data.get('ok'):
+        logger.error('users.conversations failed: %s', data.get('error'))
+        return ([], None)
+    channels = [
+        {'id': ch['id'], 'name': ch.get('name', '')}
+        for ch in data.get('channels', [])
+    ]
+    next_cursor = (data.get('response_metadata') or {}).get('next_cursor') or None
+    return (channels, next_cursor)
+
+
 def views_open(trigger_id, view, team_id):
     """Open a modal view.
 

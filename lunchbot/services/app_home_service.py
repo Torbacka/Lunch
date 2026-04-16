@@ -7,10 +7,11 @@ import json
 
 # Action IDs for button clicks
 ACTION_BEGIN_SETUP = 'app_home_begin_setup'
-ACTION_EDIT_CHANNEL = 'app_home_edit_channel'
-ACTION_EDIT_SCHEDULE = 'app_home_edit_schedule'
 ACTION_EDIT_POLL_SIZE = 'app_home_edit_poll_size'
-ACTION_REMOVE_SCHEDULE = 'app_home_remove_schedule'
+
+# Per-channel schedule action IDs (Phase 07.2 Plan 06)
+ACTION_OPEN_SCHEDULE_CHANNEL_MODAL = 'open_schedule_channel_modal'
+ACTION_EDIT_CHANNEL_SCHEDULE = 'edit_channel_schedule'
 
 # Offices section action IDs (Phase 07.1 Plan 06)
 ACTION_ADD_OFFICE_FROM_HOME = 'app_home_add_office'
@@ -19,10 +20,8 @@ ACTION_SET_DEFAULT_OFFICE = 'app_home_set_default_office'
 ACTION_DELETE_OFFICE = 'app_home_delete_office'
 
 # Callback IDs for modal submissions
-CALLBACK_CHANNEL = 'modal_channel'
-CALLBACK_SCHEDULE = 'modal_schedule'
+CALLBACK_SCHEDULE_CHANNEL = 'schedule_channel_modal'
 CALLBACK_POLL_SIZE = 'modal_poll_size'
-CALLBACK_REMOVE_SCHEDULE = 'modal_remove_schedule'
 CALLBACK_RENAME_OFFICE = 'modal_rename_office'
 CALLBACK_DELETE_OFFICE = 'modal_delete_office'
 
@@ -59,7 +58,7 @@ def _format_time_12h(t):
     return f'{display_hour}:{minute:02d} {ampm}'
 
 
-def build_home_view(settings, is_admin=True, locations=None):
+def build_home_view(settings, is_admin=True, locations=None, schedules=None):
     """Build the App Home tab view.
 
     Args:
@@ -68,15 +67,19 @@ def build_home_view(settings, is_admin=True, locations=None):
         locations: list of workspace_location rows (as from list_workspace_locations)
                    or None. Caller is responsible for fetching; this module stays
                    DB-free.
+        schedules: list of channel_schedule dicts from list_channel_schedules,
+                   or None. Each dict has channel_id, schedule_time,
+                   schedule_timezone, schedule_weekdays.
 
     Returns:
         dict with type 'home' and blocks list
     """
-    is_configured = settings is not None and settings.get('poll_channel') is not None
+    is_configured = settings is not None
     locations = locations or []
+    schedules = schedules or []
 
     if is_configured:
-        blocks = _build_state_b(settings, is_admin, locations)
+        blocks = _build_state_b(settings, is_admin, locations, schedules)
     else:
         blocks = _build_state_a(is_admin)
 
@@ -117,87 +120,17 @@ def _build_state_a(is_admin):
     return blocks
 
 
-def _build_state_b(settings, is_admin, locations=None):
-    """State B: configured workspace with channel set."""
+def _build_state_b(settings, is_admin, locations=None, schedules=None):
+    """State B: configured workspace."""
     locations = locations or []
+    schedules = schedules or []
     blocks = [
         {'type': 'header', 'text': {'type': 'plain_text', 'text': 'LunchBot Settings'}},
         {'type': 'divider'},
     ]
 
-    # Poll Channel row
-    channel_id = settings.get('poll_channel', '')
-    channel_section = {
-        'type': 'section',
-        'text': {
-            'type': 'mrkdwn',
-            'text': f':hash: *Poll Channel*\n<#{channel_id}>',
-        },
-    }
-    if is_admin:
-        channel_section['accessory'] = {
-            'type': 'button',
-            'text': {'type': 'plain_text', 'text': 'Edit'},
-            'action_id': ACTION_EDIT_CHANNEL,
-        }
-    blocks.append(channel_section)
-    blocks.append({'type': 'divider'})
-
-    # Schedule row
-    schedule_time = settings.get('poll_schedule_time')
-    schedule_tz = settings.get('poll_schedule_timezone')
-    schedule_days = settings.get('poll_schedule_weekdays')
-
-    has_schedule = schedule_time is not None
-
-    if has_schedule:
-        time_str = _format_time_12h(schedule_time)
-        days_str = ', '.join(schedule_days) if schedule_days else ''
-        schedule_section = {
-            'type': 'section',
-            'text': {
-                'type': 'mrkdwn',
-                'text': f':clock3: *Poll Schedule*\n{time_str}, {schedule_tz}\n{days_str}',
-            },
-        }
-        if is_admin:
-            schedule_section['accessory'] = {
-                'type': 'button',
-                'text': {'type': 'plain_text', 'text': 'Edit'},
-                'action_id': ACTION_EDIT_SCHEDULE,
-            }
-        blocks.append(schedule_section)
-
-        if is_admin:
-            blocks.append({
-                'type': 'actions',
-                'elements': [{
-                    'type': 'button',
-                    'text': {'type': 'plain_text', 'text': 'Remove Schedule'},
-                    'action_id': ACTION_REMOVE_SCHEDULE,
-                    'style': 'danger',
-                }],
-            })
-    else:
-        schedule_section = {
-            'type': 'section',
-            'text': {
-                'type': 'mrkdwn',
-                'text': ':clock3: *Poll Schedule*\nNo schedule configured. Polls are triggered manually with `/lunch`.',
-            },
-        }
-        if is_admin:
-            schedule_section['accessory'] = {
-                'type': 'button',
-                'text': {'type': 'plain_text', 'text': 'Set Schedule'},
-                'action_id': ACTION_EDIT_SCHEDULE,
-            }
-        blocks.append(schedule_section)
-
-    blocks.append({
-        'type': 'context',
-        'elements': [{'type': 'mrkdwn', 'text': 'Polls post automatically at the scheduled time.'}],
-    })
+    # Per-channel schedule list (replaces legacy Poll Channel + Poll Schedule)
+    blocks.extend(_build_channel_schedules_section(schedules, is_admin))
     blocks.append({'type': 'divider'})
 
     # Poll Size row
@@ -237,138 +170,140 @@ def _build_state_b(settings, is_admin, locations=None):
     return blocks
 
 
-def build_channel_modal(current_channel=None, team_id=None):
-    """Build the channel selection modal.
+def build_schedule_channel_modal(channels, team_id=None, existing=None):
+    """Build the per-channel schedule modal (D-14, D-16).
 
     Args:
-        current_channel: current poll channel ID, or None
+        channels: list of dicts with 'id' and 'name' (from list_bot_channels)
         team_id: workspace team ID for private_metadata
+        existing: existing channel_schedule dict for edit mode, or None for create
 
     Returns:
         Modal view dict
     """
-    element = {
-        'type': 'conversations_select',
-        'action_id': 'channel_select',
-        'filter': {
-            'include': ['public', 'private'],
-            'exclude_bot_users': True,
-        },
-    }
-    if current_channel:
-        element['initial_conversation'] = current_channel
+    private_meta = {'team_id': team_id}
+    modal_blocks = []
 
-    return {
-        'type': 'modal',
-        'callback_id': CALLBACK_CHANNEL,
-        'title': {'type': 'plain_text', 'text': 'Poll Channel'},
-        'submit': {'type': 'plain_text', 'text': 'Save Channel'},
-        'close': {'type': 'plain_text', 'text': 'Keep Current Channel'},
-        'private_metadata': json.dumps({'team_id': team_id}),
-        'blocks': [
-            {
-                'type': 'input',
-                'block_id': 'channel_select_block',
-                'label': {'type': 'plain_text', 'text': 'Channel'},
-                'element': element,
+    if existing:
+        # Edit mode: show channel as read-only text, store channel_id in metadata
+        private_meta['channel_id'] = existing['channel_id']
+        channel_name = existing.get('channel_name', existing['channel_id'])
+        modal_blocks.append({
+            'type': 'section',
+            'text': {
+                'type': 'mrkdwn',
+                'text': f':hash: *Channel:* <#{existing["channel_id"]}>',
             },
-        ],
-    }
+        })
+    else:
+        # Create mode: channel picker
+        channel_options = [
+            {
+                'text': {'type': 'plain_text', 'text': f'#{ch["name"]}'},
+                'value': ch['id'],
+            }
+            for ch in channels
+        ]
+        if not channel_options:
+            channel_options = [
+                {'text': {'type': 'plain_text', 'text': 'No channels'}, 'value': '_none_'},
+            ]
+        modal_blocks.append({
+            'type': 'input',
+            'block_id': 'schedule_channel_block',
+            'label': {'type': 'plain_text', 'text': 'Channel'},
+            'element': {
+                'type': 'static_select',
+                'action_id': 'schedule_channel',
+                'placeholder': {'type': 'plain_text', 'text': 'Select a channel'},
+                'options': channel_options,
+            },
+        })
 
-
-def build_schedule_modal(current_time=None, current_tz=None, current_days=None, team_id=None):
-    """Build the schedule configuration modal.
-
-    Args:
-        current_time: current schedule time (datetime.time), or None
-        current_tz: current timezone string, or None
-        current_days: current weekday list, or None
-        team_id: workspace team ID for private_metadata
-
-    Returns:
-        Modal view dict
-    """
     # Time picker
     time_element = {
         'type': 'timepicker',
         'action_id': 'schedule_time',
         'placeholder': {'type': 'plain_text', 'text': 'Select time'},
     }
-    if current_time:
-        time_element['initial_time'] = f'{current_time.hour:02d}:{current_time.minute:02d}'
+    if existing and existing.get('schedule_time') and hasattr(existing['schedule_time'], 'hour'):
+        t = existing['schedule_time']
+        time_element['initial_time'] = f'{t.hour:02d}:{t.minute:02d}'
     else:
         time_element['initial_time'] = '11:30'
 
+    modal_blocks.append({
+        'type': 'input',
+        'block_id': 'schedule_time_block',
+        'label': {'type': 'plain_text', 'text': 'Time'},
+        'element': time_element,
+    })
+
     # Timezone select
     tz_options = [
-        {
-            'text': {'type': 'plain_text', 'text': tz},
-            'value': tz,
-        }
+        {'text': {'type': 'plain_text', 'text': tz}, 'value': tz}
         for tz in TIMEZONE_OPTIONS
     ]
-    initial_tz = current_tz or 'Europe/Stockholm'
-    tz_element = {
-        'type': 'static_select',
-        'action_id': 'schedule_tz',
-        'placeholder': {'type': 'plain_text', 'text': 'Select timezone'},
-        'options': tz_options,
-        'initial_option': {
-            'text': {'type': 'plain_text', 'text': initial_tz},
-            'value': initial_tz,
+    initial_tz = (existing or {}).get('schedule_timezone') or 'Europe/Stockholm'
+    modal_blocks.append({
+        'type': 'input',
+        'block_id': 'schedule_tz_block',
+        'label': {'type': 'plain_text', 'text': 'Timezone'},
+        'element': {
+            'type': 'static_select',
+            'action_id': 'schedule_tz',
+            'placeholder': {'type': 'plain_text', 'text': 'Select timezone'},
+            'options': tz_options,
+            'initial_option': {
+                'text': {'type': 'plain_text', 'text': initial_tz},
+                'value': initial_tz,
+            },
         },
-    }
+    })
 
-    # Weekday checkboxes
-    day_options = [
-        {
-            'text': {'type': 'plain_text', 'text': day},
-            'value': day,
-        }
-        for day in WEEKDAYS
+    # Weekday multi-select
+    weekday_values = [
+        ('Monday', 'mon'), ('Tuesday', 'tue'), ('Wednesday', 'wed'),
+        ('Thursday', 'thu'), ('Friday', 'fri'), ('Saturday', 'sat'), ('Sunday', 'sun'),
     ]
-    initial_days = current_days or ['Mon', 'Tue', 'Wed', 'Thu', 'Fri']
-    initial_day_options = [
-        {
-            'text': {'type': 'plain_text', 'text': day},
-            'value': day,
-        }
-        for day in initial_days
+    weekday_options = [
+        {'text': {'type': 'plain_text', 'text': label}, 'value': val}
+        for label, val in weekday_values
     ]
-    days_element = {
-        'type': 'checkboxes',
-        'action_id': 'schedule_days',
-        'options': day_options,
-        'initial_options': initial_day_options,
-    }
+    # Default to mon-fri; for edit, parse existing weekdays
+    default_vals = {'mon', 'tue', 'wed', 'thu', 'fri'}
+    if existing and existing.get('schedule_weekdays'):
+        raw = existing['schedule_weekdays']
+        if isinstance(raw, str):
+            default_vals = set(raw.split(','))
+        else:
+            default_vals = set(raw)
+    initial_weekday_options = [
+        {'text': {'type': 'plain_text', 'text': label}, 'value': val}
+        for label, val in weekday_values
+        if val in default_vals
+    ]
+    modal_blocks.append({
+        'type': 'input',
+        'block_id': 'schedule_weekdays_block',
+        'label': {'type': 'plain_text', 'text': 'Weekdays'},
+        'element': {
+            'type': 'multi_static_select',
+            'action_id': 'schedule_weekdays',
+            'placeholder': {'type': 'plain_text', 'text': 'Select days'},
+            'options': weekday_options,
+            'initial_options': initial_weekday_options if initial_weekday_options else None,
+        },
+    })
 
     return {
         'type': 'modal',
-        'callback_id': CALLBACK_SCHEDULE,
-        'title': {'type': 'plain_text', 'text': 'Poll Schedule'},
-        'submit': {'type': 'plain_text', 'text': 'Save Schedule'},
-        'close': {'type': 'plain_text', 'text': 'Keep Current Schedule'},
-        'private_metadata': json.dumps({'team_id': team_id}),
-        'blocks': [
-            {
-                'type': 'input',
-                'block_id': 'schedule_time_block',
-                'label': {'type': 'plain_text', 'text': 'Time'},
-                'element': time_element,
-            },
-            {
-                'type': 'input',
-                'block_id': 'schedule_tz_block',
-                'label': {'type': 'plain_text', 'text': 'Timezone'},
-                'element': tz_element,
-            },
-            {
-                'type': 'input',
-                'block_id': 'schedule_days_block',
-                'label': {'type': 'plain_text', 'text': 'Days'},
-                'element': days_element,
-            },
-        ],
+        'callback_id': CALLBACK_SCHEDULE_CHANNEL,
+        'title': {'type': 'plain_text', 'text': 'Channel Schedule'},
+        'submit': {'type': 'plain_text', 'text': 'Save'},
+        'close': {'type': 'plain_text', 'text': 'Cancel'},
+        'private_metadata': json.dumps(private_meta),
+        'blocks': modal_blocks,
     }
 
 
@@ -442,6 +377,65 @@ def build_poll_size_modal(current_size=None, current_smart=None, team_id=None):
             },
         ],
     }
+
+
+def _build_channel_schedules_section(schedules, is_admin):
+    """Build the per-channel poll schedules section for App Home (D-14, D-16).
+
+    Args:
+        schedules: list of channel_schedule dicts with channel_id,
+                   schedule_time, schedule_timezone, schedule_weekdays
+        is_admin: whether the viewing user is a workspace admin
+    """
+    blocks = [
+        {'type': 'header', 'text': {'type': 'plain_text', 'text': 'Per-channel poll schedules'}},
+    ]
+
+    if not schedules:
+        blocks.append({
+            'type': 'context',
+            'elements': [{'type': 'mrkdwn', 'text': 'No channel schedules yet \u2014 click Schedule a channel to add one.'}],
+        })
+    else:
+        for sched in schedules:
+            channel_id = sched.get('channel_id', '')
+            sched_time = sched.get('schedule_time')
+            if sched_time and hasattr(sched_time, 'hour'):
+                time_str = _format_time_12h(sched_time)
+            else:
+                time_str = str(sched_time) if sched_time else ''
+            tz = sched.get('schedule_timezone', '')
+            weekdays = sched.get('schedule_weekdays', '')
+            if isinstance(weekdays, list):
+                weekdays = ','.join(weekdays)
+            section = {
+                'type': 'section',
+                'text': {
+                    'type': 'mrkdwn',
+                    'text': f'<#{channel_id}> \u2014 {time_str} {tz} \u2014 {weekdays}',
+                },
+            }
+            if is_admin:
+                section['accessory'] = {
+                    'type': 'button',
+                    'text': {'type': 'plain_text', 'text': 'Edit'},
+                    'action_id': ACTION_EDIT_CHANNEL_SCHEDULE,
+                    'value': channel_id,
+                }
+            blocks.append(section)
+
+    if is_admin:
+        blocks.append({
+            'type': 'actions',
+            'elements': [{
+                'type': 'button',
+                'text': {'type': 'plain_text', 'text': 'Schedule a channel'},
+                'action_id': ACTION_OPEN_SCHEDULE_CHANNEL_MODAL,
+                'style': 'primary',
+            }],
+        })
+
+    return blocks
 
 
 def _build_offices_section(locations, is_admin):
@@ -559,29 +553,3 @@ def build_delete_office_modal(team_id, location_id, current_name):
     }
 
 
-def build_remove_schedule_modal(team_id=None):
-    """Build the remove schedule confirmation modal.
-
-    Args:
-        team_id: workspace team ID for private_metadata
-
-    Returns:
-        Modal view dict
-    """
-    return {
-        'type': 'modal',
-        'callback_id': CALLBACK_REMOVE_SCHEDULE,
-        'title': {'type': 'plain_text', 'text': 'Remove Schedule'},
-        'submit': {'type': 'plain_text', 'text': 'Remove Schedule'},
-        'close': {'type': 'plain_text', 'text': 'Keep Schedule'},
-        'private_metadata': json.dumps({'team_id': team_id}),
-        'blocks': [
-            {
-                'type': 'section',
-                'text': {
-                    'type': 'mrkdwn',
-                    'text': "Are you sure you want to remove the automatic poll schedule? Polls will only be triggered manually with `/lunch`.",
-                },
-            },
-        ],
-    }

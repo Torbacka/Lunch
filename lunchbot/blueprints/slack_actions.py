@@ -4,7 +4,6 @@ Handles: /action (vote clicks, suggestion select, App Home buttons, modal submis
          /find_suggestions (external select search).
 """
 import json
-import threading
 import structlog
 from datetime import date, time
 
@@ -19,7 +18,7 @@ from lunchbot.client.workspace_client import (
     set_default_workspace_location,
 )
 from lunchbot.client import slack_client
-from lunchbot.services import vote_service, poll_service, seed_service
+from lunchbot.services import vote_service, poll_service
 from lunchbot.blueprints.polls import (
     CHANNEL_LOC_USE_DEFAULT, CHANNEL_LOC_PICK, CHANNEL_LOC_ADD_OFFICE,
 )
@@ -28,18 +27,18 @@ from lunchbot.services.office_modal_service import (
     OFFICE_SEARCH_BLOCK,
 )
 from lunchbot.services.app_home_service import (
-    build_home_view, build_channel_modal, build_schedule_modal,
-    build_poll_size_modal, build_remove_schedule_modal,
+    build_home_view, build_schedule_channel_modal,
+    build_poll_size_modal,
     build_rename_office_modal, build_delete_office_modal,
-    ACTION_BEGIN_SETUP, ACTION_EDIT_CHANNEL, ACTION_EDIT_SCHEDULE,
-    ACTION_EDIT_POLL_SIZE, ACTION_REMOVE_SCHEDULE,
+    ACTION_BEGIN_SETUP,
+    ACTION_EDIT_POLL_SIZE,
+    ACTION_OPEN_SCHEDULE_CHANNEL_MODAL, ACTION_EDIT_CHANNEL_SCHEDULE,
     ACTION_ADD_OFFICE_FROM_HOME, ACTION_RENAME_OFFICE,
     ACTION_SET_DEFAULT_OFFICE, ACTION_DELETE_OFFICE,
-    CALLBACK_CHANNEL, CALLBACK_SCHEDULE, CALLBACK_POLL_SIZE,
-    CALLBACK_REMOVE_SCHEDULE,
+    CALLBACK_SCHEDULE_CHANNEL, CALLBACK_POLL_SIZE,
     CALLBACK_RENAME_OFFICE, CALLBACK_DELETE_OFFICE,
 )
-from lunchbot.services.scheduler_service import update_schedule_job, remove_schedule_job
+from lunchbot.services.scheduler_service import update_schedule_job
 
 logger = structlog.get_logger(__name__)
 
@@ -47,8 +46,9 @@ bp = Blueprint('slack_actions', __name__)
 
 # App Home action IDs for dispatch
 _APP_HOME_ACTIONS = frozenset({
-    ACTION_BEGIN_SETUP, ACTION_EDIT_CHANNEL, ACTION_EDIT_SCHEDULE,
-    ACTION_EDIT_POLL_SIZE, ACTION_REMOVE_SCHEDULE,
+    ACTION_BEGIN_SETUP,
+    ACTION_EDIT_POLL_SIZE,
+    ACTION_OPEN_SCHEDULE_CHANNEL_MODAL, ACTION_EDIT_CHANNEL_SCHEDULE,
     ACTION_ADD_OFFICE_FROM_HOME, ACTION_RENAME_OFFICE,
     ACTION_SET_DEFAULT_OFFICE, ACTION_DELETE_OFFICE,
 })
@@ -158,23 +158,24 @@ def _handle_channel_location_bind(action_id, payload, first_action):
 
 def _handle_app_home_action(action_id, team_id, trigger_id, user_id=None, first_action=None):
     """Handle App Home button clicks by opening the appropriate modal."""
-    if action_id in (ACTION_BEGIN_SETUP, ACTION_EDIT_CHANNEL):
-        settings = get_workspace_settings(team_id)
-        modal = build_channel_modal(
-            current_channel=settings.get('poll_channel') if settings else None,
-            team_id=team_id,
-        )
+    if action_id == ACTION_BEGIN_SETUP:
+        # Begin-setup now opens the schedule-channel modal (no workspace-level channel picker)
+        channels, _ = slack_client.list_bot_channels(team_id)
+        modal = build_schedule_channel_modal(channels, team_id=team_id)
         slack_client.views_open(trigger_id, modal, team_id)
         return '', 200
 
-    if action_id == ACTION_EDIT_SCHEDULE:
-        settings = get_workspace_settings(team_id)
-        modal = build_schedule_modal(
-            current_time=settings.get('poll_schedule_time') if settings else None,
-            current_tz=settings.get('poll_schedule_timezone') if settings else None,
-            current_days=settings.get('poll_schedule_weekdays') if settings else None,
-            team_id=team_id,
-        )
+    if action_id == ACTION_OPEN_SCHEDULE_CHANNEL_MODAL:
+        channels, _ = slack_client.list_bot_channels(team_id)
+        modal = build_schedule_channel_modal(channels, team_id=team_id)
+        slack_client.views_open(trigger_id, modal, team_id)
+        return '', 200
+
+    if action_id == ACTION_EDIT_CHANNEL_SCHEDULE:
+        channel_id = (first_action or {}).get('value', '')
+        existing = db_client.get_channel_schedule(team_id, channel_id)
+        channels, _ = slack_client.list_bot_channels(team_id)
+        modal = build_schedule_channel_modal(channels, team_id=team_id, existing=existing)
         slack_client.views_open(trigger_id, modal, team_id)
         return '', 200
 
@@ -185,11 +186,6 @@ def _handle_app_home_action(action_id, team_id, trigger_id, user_id=None, first_
             current_smart=settings.get('smart_picks') if settings else None,
             team_id=team_id,
         )
-        slack_client.views_open(trigger_id, modal, team_id)
-        return '', 200
-
-    if action_id == ACTION_REMOVE_SCHEDULE:
-        modal = build_remove_schedule_modal(team_id=team_id)
         slack_client.views_open(trigger_id, modal, team_id)
         return '', 200
 
@@ -266,39 +262,34 @@ def _handle_view_submission(payload):
     if not team_id:
         return '', 200
 
-    if callback_id == CALLBACK_CHANNEL:
-        channel = _extract_value(values, 'channel_select', 'selected_conversation')
-        if channel:
-            update_workspace_settings(team_id, poll_channel=channel)
-        _refresh_app_home(user_id, team_id)
-        return '', 200
+    if callback_id == CALLBACK_SCHEDULE_CHANNEL:
+        # Channel from static_select (create) or private_metadata (edit)
+        channel_id = _extract_value(values, 'schedule_channel', 'selected_option', key='value')
+        if not channel_id:
+            channel_id = private_metadata.get('channel_id')
+        if not channel_id:
+            return jsonify({
+                'response_action': 'errors',
+                'errors': {'schedule_channel_block': 'Select a channel.'},
+            })
 
-    if callback_id == CALLBACK_SCHEDULE:
         time_str = _extract_value(values, 'schedule_time', 'selected_time')
         tz = _extract_value(values, 'schedule_tz', 'selected_option', key='value')
-        days_raw = _extract_value(values, 'schedule_days', 'selected_options')
+        days_raw = _extract_value(values, 'schedule_weekdays', 'selected_options')
         days = [d['value'] for d in (days_raw or [])]
 
         if not days:
             return jsonify({
                 'response_action': 'errors',
-                'errors': {'schedule_days_block': 'Select at least one day.'}
+                'errors': {'schedule_weekdays_block': 'Select at least one day.'},
             })
 
         h, m = (int(x) for x in time_str.split(':'))
         time_val = time(h, m)
+        weekdays_str = ','.join(days)
 
-        update_workspace_settings(
-            team_id,
-            poll_schedule_time=time_val,
-            poll_schedule_timezone=tz,
-            poll_schedule_weekdays=days,
-        )
-        settings = get_workspace_settings(team_id)
-        update_schedule_job(
-            team_id, time_val, tz, days,
-            channel=settings.get('poll_channel') if settings else None,
-        )
+        db_client.upsert_channel_schedule(team_id, channel_id, time_val, tz, weekdays_str)
+        update_schedule_job(team_id, channel_id, time_val, tz, days)
         _refresh_app_home(user_id, team_id)
         return '', 200
 
@@ -346,17 +337,6 @@ def _handle_view_submission(payload):
         _refresh_app_home(user_id, team_id)
         return '', 200
 
-    if callback_id == CALLBACK_REMOVE_SCHEDULE:
-        update_workspace_settings(
-            team_id,
-            poll_schedule_time=None,
-            poll_schedule_timezone=None,
-            poll_schedule_weekdays=None,
-        )
-        remove_schedule_job(team_id)
-        _refresh_app_home(user_id, team_id)
-        return '', 200
-
     if callback_id == CALLBACK_ADD_OFFICE:
         channel_id = private_metadata.get('channel_id')
         place_id = _extract_value(
@@ -390,15 +370,6 @@ def _handle_view_submission(payload):
             team_id=team_id, location_id=row['id'],
             actor_user_id=user_id, via=via,
         )
-
-        # Seed restaurants for the new office in a background thread
-        app = current_app._get_current_object()
-        thread = threading.Thread(
-            target=seed_service._seed_office_restaurants,
-            args=(app, team_id, row['id'], lat_lng),
-            daemon=True,
-        )
-        thread.start()
 
         if channel_id:
             bind_channel_location(team_id, channel_id, row['id'])
@@ -434,8 +405,9 @@ def _refresh_app_home(user_id, team_id):
         return
     settings = get_workspace_settings(team_id)
     locations = list_workspace_locations(team_id) or []
+    schedules = db_client.list_channel_schedules(team_id)
     is_admin = slack_client.is_workspace_admin(user_id, team_id)
-    view = build_home_view(settings, is_admin=is_admin, locations=locations)
+    view = build_home_view(settings, is_admin=is_admin, locations=locations, schedules=schedules)
     slack_client.views_publish(user_id, view, team_id)
 
 
@@ -476,7 +448,7 @@ def find_suggestions():
         return jsonify({'options': []})
 
     response = places_client.find_suggestion(search_value, location)
-    db_client.save_restaurants(response, location_row['id'])
+    db_client.save_restaurants(response)
 
     options = []
     for result in response.get('results', []):

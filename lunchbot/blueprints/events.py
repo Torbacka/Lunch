@@ -15,7 +15,7 @@ from flask import Blueprint, request, jsonify
 from lunchbot.client.workspace_client import (
     deactivate_workspace, get_workspace_settings, list_workspace_locations,
 )
-from lunchbot.client import slack_client
+from lunchbot.client import slack_client, db_client
 from lunchbot.services.app_home_service import build_home_view
 
 logger = logging.getLogger(__name__)
@@ -70,8 +70,10 @@ def events():
             is_admin = slack_client.is_workspace_admin(user_id, team_id)
             settings = get_workspace_settings(team_id)
             locations = list_workspace_locations(team_id) or []
+            schedules = db_client.list_channel_schedules(team_id)
             view = build_home_view(
                 settings, is_admin=is_admin, locations=locations,
+                schedules=schedules,
             )
             slack_client.views_publish(user_id, view, team_id)
             logger.info('Published App Home for user %s in workspace %s (admin=%s)',
