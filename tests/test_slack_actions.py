@@ -42,8 +42,10 @@ class TestListBotChannelsFiltersToMembers:
 
 
 class TestAddOfficeModalSeedsWithLocation:
-    """Add-office modal creates a workspace_location and binds the channel."""
+    """Add-office modal creates a workspace_location, seeds restaurants, and binds the channel."""
 
+    @patch('lunchbot.blueprints.slack_actions.seed_service')
+    @patch('lunchbot.blueprints.slack_actions.threading')
     @patch('lunchbot.blueprints.slack_actions.slack_client')
     @patch('lunchbot.blueprints.slack_actions.places_client')
     @patch('lunchbot.blueprints.slack_actions.create_workspace_location')
@@ -52,7 +54,8 @@ class TestAddOfficeModalSeedsWithLocation:
     @patch('lunchbot.blueprints.slack_actions.poll_service')
     def test_add_office_modal_seeds_with_location(
         self, mock_poll, mock_bind, mock_list_locs,
-        mock_create_loc, mock_places, mock_slack, app, client,
+        mock_create_loc, mock_places, mock_slack,
+        mock_threading, mock_seed, app, client,
     ):
         app.config['SLACK_SIGNING_SECRET'] = None
 
@@ -99,3 +102,11 @@ class TestAddOfficeModalSeedsWithLocation:
 
         # Verify bind_channel_location was called with the new location_id
         mock_bind.assert_called_once_with('T123', 'C_BOUND', 42)
+
+        # Verify seed_service._seed_office_restaurants is called via background thread
+        mock_threading.Thread.assert_called_once()
+        thread_kwargs = mock_threading.Thread.call_args
+        assert thread_kwargs[1]['target'] == mock_seed._seed_office_restaurants
+        assert thread_kwargs[1]['args'][1] == 'T123'  # team_id
+        assert thread_kwargs[1]['args'][2] == 42       # location_id (row['id'])
+        mock_threading.Thread.return_value.start.assert_called_once()
