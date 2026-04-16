@@ -82,23 +82,29 @@ def toggle_vote(poll_option_id, user_id):
             return 'added'
 
 
-def upsert_suggestion(poll_date, restaurant_id, workspace_id=None,
+def upsert_suggestion(poll_date, restaurant_id, workspace_id, slack_channel_id,
                       pick_type='random', cuisine=None, walking_minutes=None):
     """Add a restaurant as a poll option for today. Replaces mongo_client.update_suggestions().
     Creates poll if it doesn't exist, then adds restaurant as option.
+    slack_channel_id is required (D-11: polls are channel-bound at insert time).
     """
     workspace_id = workspace_id or getattr(g, 'workspace_id', None)
     with get_pool().connection() as conn:
         if workspace_id:
             conn.execute(f"SET app.current_tenant = '{workspace_id}'")
         with conn.cursor(row_factory=dict_row) as cur:
-            # Upsert poll for this date
+            # Upsert poll for this date with slack_channel_id
             cur.execute("""
-                INSERT INTO polls (poll_date, workspace_id)
-                VALUES (%(poll_date)s, %(workspace_id)s)
-                ON CONFLICT (poll_date, workspace_id) DO UPDATE SET poll_date = EXCLUDED.poll_date
+                INSERT INTO polls (poll_date, workspace_id, slack_channel_id)
+                VALUES (%(poll_date)s, %(workspace_id)s, %(slack_channel_id)s)
+                ON CONFLICT (poll_date, workspace_id) DO UPDATE SET
+                    slack_channel_id = EXCLUDED.slack_channel_id
                 RETURNING id
-            """, {'poll_date': poll_date, 'workspace_id': workspace_id})
+            """, {
+                'poll_date': poll_date,
+                'workspace_id': workspace_id,
+                'slack_channel_id': slack_channel_id,
+            })
             poll = cur.fetchone()
             poll_id = poll['id']
 
@@ -129,10 +135,11 @@ def upsert_suggestion(poll_date, restaurant_id, workspace_id=None,
             return poll_id
 
 
-def save_restaurant(restaurant, workspace_id=None):
+def save_restaurant(restaurant, location_id, workspace_id=None):
     """Upsert a restaurant from Google Places API response.
     Replaces mongo_client.save_restaurants_info() for single restaurant.
     Returns the restaurant id.
+    location_id is the owning office (D-07: seed paths tag restaurants with location_id).
     workspace_id can be passed explicitly or read from g.workspace_id.
     """
     workspace_id = workspace_id or getattr(g, 'workspace_id', None)
@@ -142,10 +149,11 @@ def save_restaurant(restaurant, workspace_id=None):
         with conn.cursor(row_factory=dict_row) as cur:
             cur.execute("""
                 INSERT INTO restaurants (place_id, name, rating, price_level, geometry, photos,
-                    opening_hours, icon, vicinity, types, user_ratings_total, workspace_id)
+                    opening_hours, icon, vicinity, types, user_ratings_total, workspace_id,
+                    location_id)
                 VALUES (%(place_id)s, %(name)s, %(rating)s, %(price_level)s, %(geometry)s,
                     %(photos)s, %(opening_hours)s, %(icon)s, %(vicinity)s, %(types)s,
-                    %(user_ratings_total)s, %(workspace_id)s)
+                    %(user_ratings_total)s, %(workspace_id)s, %(location_id)s)
                 ON CONFLICT (place_id) DO UPDATE SET
                     name = EXCLUDED.name,
                     rating = EXCLUDED.rating,
@@ -158,6 +166,7 @@ def save_restaurant(restaurant, workspace_id=None):
                     types = EXCLUDED.types,
                     user_ratings_total = EXCLUDED.user_ratings_total,
                     workspace_id = EXCLUDED.workspace_id,
+                    location_id = COALESCE(restaurants.location_id, EXCLUDED.location_id),
                     updated_at = NOW()
                 RETURNING id
             """, {
@@ -173,19 +182,21 @@ def save_restaurant(restaurant, workspace_id=None):
                 'types': restaurant.get('types'),
                 'user_ratings_total': restaurant.get('user_ratings_total'),
                 'workspace_id': workspace_id,
+                'location_id': location_id,
             })
             result = cur.fetchone()
             return result['id']
 
 
-def save_restaurants(restaurants_response):
+def save_restaurants(restaurants_response, location_id):
     """Batch upsert restaurants from Google Places API search response.
     Replaces mongo_client.save_restaurants_info().
     Returns list of restaurant ids.
+    location_id is the owning office for all restaurants in this batch.
     """
     ids = []
     for restaurant in restaurants_response.get('results', []):
-        restaurant_id = save_restaurant(restaurant)
+        restaurant_id = save_restaurant(restaurant, location_id)
         ids.append(restaurant_id)
     return ids
 
@@ -242,65 +253,75 @@ def update_restaurant_url(place_id, url, website):
     """, {'url': url, 'website': website, 'place_id': place_id}, fetch='one')
 
 
-def get_or_create_stats(restaurant_id, workspace_id=None):
-    """Get or create restaurant_stats row for a restaurant.
-    Per D-14: returns dict with id, restaurant_id, workspace_id, alpha, beta, times_shown.
+def get_or_create_stats(channel_id, restaurant_id, team_id):
+    """Get or create restaurant_stats row for a channel+restaurant pair.
+    Per D-02: stats are per-channel, keyed on (channel_id, restaurant_id).
     Creates with defaults alpha=1.0, beta=1.0, times_shown=0 if not exists (D-07).
+    team_id is required for RLS and the INSERT path.
     """
-    workspace_id = workspace_id or getattr(g, 'workspace_id', None)
     with get_pool().connection() as conn:
-        if workspace_id:
-            conn.execute(f"SET app.current_tenant = '{workspace_id}'")
+        if team_id:
+            conn.execute(f"SET app.current_tenant = '{team_id}'")
         with conn.cursor(row_factory=dict_row) as cur:
             cur.execute("""
-                INSERT INTO restaurant_stats (restaurant_id, workspace_id)
-                VALUES (%(restaurant_id)s, %(workspace_id)s)
-                ON CONFLICT (restaurant_id, workspace_id) DO NOTHING
-            """, {'restaurant_id': restaurant_id, 'workspace_id': workspace_id})
+                INSERT INTO restaurant_stats (channel_id, restaurant_id, team_id)
+                VALUES (%(channel_id)s, %(restaurant_id)s, %(team_id)s)
+                ON CONFLICT (channel_id, restaurant_id) DO NOTHING
+            """, {'channel_id': channel_id, 'restaurant_id': restaurant_id, 'team_id': team_id})
             cur.execute("""
-                SELECT id, restaurant_id, workspace_id, alpha, beta, times_shown,
+                SELECT channel_id, restaurant_id, team_id, alpha, beta, times_shown,
                        created_at, updated_at
                 FROM restaurant_stats
-                WHERE restaurant_id = %(restaurant_id)s
-            """, {'restaurant_id': restaurant_id})
+                WHERE channel_id = %(channel_id)s
+                  AND restaurant_id = %(restaurant_id)s
+            """, {'channel_id': channel_id, 'restaurant_id': restaurant_id})
             return cur.fetchone()
 
 
-def get_candidate_pool(poll_date):
-    """Get all workspace restaurants NOT in today's poll, with their stats.
-    Per D-15: candidate pool is all restaurants not already in today's poll.
+def get_candidate_pool(poll_date, channel_id):
+    """Get office-scoped restaurants NOT in today's poll, with per-channel stats.
+    Per D-08: resolves channel_id -> location_id via channel_locations CTE,
+    then filters restaurants by that office. Stats joined on (channel_id, restaurant_id).
     Returns list of dicts with restaurant_id, name, place_id, alpha, beta, times_shown,
     plus types and geometry for cuisine/distance computation.
     Uses LEFT JOIN so restaurants without stats get defaults alpha=1.0, beta=1.0 (D-07).
     Handles Pitfall 2: COALESCE ensures NULL stats rows get uninformative prior.
     """
     return execute_with_tenant("""
-        SELECT r.id AS restaurant_id, r.name, r.place_id,
-               r.types, r.geometry,
+        WITH channel_office AS (
+            SELECT location_id
+            FROM channel_locations
+            WHERE team_id = current_setting('app.current_tenant', true)
+              AND channel_id = %(channel_id)s
+        )
+        SELECT r.id AS restaurant_id, r.name, r.place_id, r.types, r.geometry,
                COALESCE(rs.alpha, 1.0) AS alpha,
                COALESCE(rs.beta, 1.0) AS beta,
                COALESCE(rs.times_shown, 0) AS times_shown
         FROM restaurants r
-        LEFT JOIN restaurant_stats rs ON rs.restaurant_id = r.id
+        LEFT JOIN restaurant_stats rs
+               ON rs.restaurant_id = r.id
+              AND rs.channel_id = %(channel_id)s
         WHERE r.rating IS NOT NULL
+          AND r.location_id = (SELECT location_id FROM channel_office)
           AND r.id NOT IN (
-            SELECT po.restaurant_id
-            FROM poll_options po
-            JOIN polls p ON p.id = po.poll_id
-            WHERE p.poll_date = %(poll_date)s
-        )
+              SELECT po.restaurant_id
+              FROM poll_options po
+              JOIN polls p ON p.id = po.poll_id
+              WHERE p.poll_date = %(poll_date)s
+          )
         ORDER BY r.name
-    """, {'poll_date': poll_date})
+    """, {'poll_date': poll_date, 'channel_id': channel_id})
 
 
 def get_unprocessed_polls(before_date):
     """Get polls that haven't had their stats computed yet.
     Per D-08 + RESEARCH open question #1: finds polls where stats_processed_at IS NULL
     and poll_date < before_date. Handles gaps (multiple unprocessed days).
-    Returns list of dicts with id, poll_date, workspace_id.
+    Returns list of dicts with id, poll_date, workspace_id, slack_channel_id.
     """
     return execute_with_tenant("""
-        SELECT id, poll_date, workspace_id
+        SELECT id, poll_date, workspace_id, slack_channel_id
         FROM polls
         WHERE stats_processed_at IS NULL
           AND poll_date < %(before_date)s
@@ -340,29 +361,31 @@ def get_poll_vote_shares(poll_id):
     return rows
 
 
-def update_restaurant_stats(restaurant_id, alpha_increment, beta_increment, workspace_id=None):
+def update_restaurant_stats(channel_id, restaurant_id, alpha_increment, beta_increment, team_id):
     """Upsert restaurant stats with increments from a completed poll.
+    Per D-02: stats are per-channel, keyed on (channel_id, restaurant_id).
     Per D-06: alpha += votes_received, beta += (total_voters - votes_received).
     Per D-12: uses ON CONFLICT upsert pattern. Also increments times_shown.
+    team_id is required for RLS and the INSERT path.
     """
-    workspace_id = workspace_id or getattr(g, 'workspace_id', None)
     with get_pool().connection() as conn:
-        if workspace_id:
-            conn.execute(f"SET app.current_tenant = '{workspace_id}'")
+        if team_id:
+            conn.execute(f"SET app.current_tenant = '{team_id}'")
         with conn.cursor(row_factory=dict_row) as cur:
             cur.execute("""
-                INSERT INTO restaurant_stats (restaurant_id, workspace_id, alpha, beta, times_shown)
-                VALUES (%(restaurant_id)s, %(workspace_id)s,
+                INSERT INTO restaurant_stats (channel_id, restaurant_id, team_id, alpha, beta, times_shown)
+                VALUES (%(channel_id)s, %(restaurant_id)s, %(team_id)s,
                         1.0 + %(alpha_increment)s, 1.0 + %(beta_increment)s, 1)
-                ON CONFLICT (restaurant_id, workspace_id) DO UPDATE SET
+                ON CONFLICT (channel_id, restaurant_id) DO UPDATE SET
                     alpha = restaurant_stats.alpha + %(alpha_increment)s,
                     beta = restaurant_stats.beta + %(beta_increment)s,
                     times_shown = restaurant_stats.times_shown + 1,
                     updated_at = NOW()
                 RETURNING *
             """, {
+                'channel_id': channel_id,
                 'restaurant_id': restaurant_id,
-                'workspace_id': workspace_id,
+                'team_id': team_id,
                 'alpha_increment': alpha_increment,
                 'beta_increment': beta_increment,
             })
@@ -399,3 +422,80 @@ def get_poll_winner(poll_date):
         ORDER BY vote_count DESC, po.display_order ASC
         LIMIT 1
     """, {'poll_date': poll_date}, fetch='one')
+
+
+# --- Channel Schedules CRUD (D-12, D-13) ---
+
+def list_channel_schedules(team_id):
+    """List all channel schedules for a workspace.
+    Returns list of dicts with team_id, channel_id, schedule_time, schedule_timezone,
+    schedule_weekdays.
+    """
+    with get_pool().connection() as conn:
+        if team_id:
+            conn.execute(f"SET app.current_tenant = '{team_id}'")
+        with conn.cursor(row_factory=dict_row) as cur:
+            cur.execute("""
+                SELECT team_id, channel_id, schedule_time, schedule_timezone,
+                       schedule_weekdays, created_at
+                FROM channel_schedules
+                WHERE team_id = %(team_id)s
+                ORDER BY channel_id
+            """, {'team_id': team_id})
+            return cur.fetchall()
+
+
+def get_channel_schedule(team_id, channel_id):
+    """Get a single channel schedule. Returns dict or None."""
+    with get_pool().connection() as conn:
+        if team_id:
+            conn.execute(f"SET app.current_tenant = '{team_id}'")
+        with conn.cursor(row_factory=dict_row) as cur:
+            cur.execute("""
+                SELECT team_id, channel_id, schedule_time, schedule_timezone,
+                       schedule_weekdays, created_at
+                FROM channel_schedules
+                WHERE team_id = %(team_id)s AND channel_id = %(channel_id)s
+            """, {'team_id': team_id, 'channel_id': channel_id})
+            return cur.fetchone()
+
+
+def upsert_channel_schedule(team_id, channel_id, schedule_time, schedule_timezone, schedule_weekdays):
+    """Insert or update a channel schedule.
+    Uses ON CONFLICT (team_id, channel_id) DO UPDATE per D-12.
+    """
+    with get_pool().connection() as conn:
+        if team_id:
+            conn.execute(f"SET app.current_tenant = '{team_id}'")
+        with conn.cursor(row_factory=dict_row) as cur:
+            cur.execute("""
+                INSERT INTO channel_schedules (team_id, channel_id, schedule_time,
+                                               schedule_timezone, schedule_weekdays)
+                VALUES (%(team_id)s, %(channel_id)s, %(schedule_time)s,
+                        %(schedule_timezone)s, %(schedule_weekdays)s)
+                ON CONFLICT (team_id, channel_id) DO UPDATE SET
+                    schedule_time = EXCLUDED.schedule_time,
+                    schedule_timezone = EXCLUDED.schedule_timezone,
+                    schedule_weekdays = EXCLUDED.schedule_weekdays
+                RETURNING *
+            """, {
+                'team_id': team_id,
+                'channel_id': channel_id,
+                'schedule_time': schedule_time,
+                'schedule_timezone': schedule_timezone,
+                'schedule_weekdays': schedule_weekdays,
+            })
+            return cur.fetchone()
+
+
+def delete_channel_schedule(team_id, channel_id):
+    """Delete a channel schedule. Returns True if a row was deleted."""
+    with get_pool().connection() as conn:
+        if team_id:
+            conn.execute(f"SET app.current_tenant = '{team_id}'")
+        with conn.cursor() as cur:
+            cur.execute("""
+                DELETE FROM channel_schedules
+                WHERE team_id = %(team_id)s AND channel_id = %(channel_id)s
+            """, {'team_id': team_id, 'channel_id': channel_id})
+            return cur.rowcount > 0
