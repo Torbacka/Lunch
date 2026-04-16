@@ -42,7 +42,7 @@ Teams can quickly and fairly decide where to eat lunch together, with smart sugg
 - [ ] Configurable poll size (admin sets number of options and smart pick ratio)
 - [ ] Restaurant reputation tracking (win rate, times shown, satisfaction)
 - [ ] Poll auto-close with configurable duration and winner summary
-- [ ] Configurable poll schedule (time, timezone, weekdays) per workspace
+- [ ] Configurable poll schedule (time, timezone, weekdays) per channel
 - [ ] App Home onboarding flow for new workspace installations
 - [ ] Production monitoring & logging for self-hosted Docker deployment
 - [ ] Landing page with marketing content and "Add to Slack" button
@@ -61,9 +61,9 @@ Teams can quickly and fairly decide where to eat lunch together, with smart sugg
 
 ## Context
 
-- Phases 1-3 complete: modern Python 3.12/Flask 3.x stack, PostgreSQL with RLS multi-tenancy, core bot features all migrated (85 tests passing)
+- Phases 1-7.2 complete: modern Python 3.12/Flask 3.x stack, PostgreSQL with RLS multi-tenancy, core bot features migrated, smart recommendations, poll automation, observability, web presence, multi-office UX, and per-channel Thompson sampling (287 tests passing)
 - Docker deployment with blue-green strategy, CI/CD via self-hosted GitHub Actions, and TLS are already working
-- Only monitoring/logging still needed for full production readiness
+- Phase 07.2 complete: office-scoped candidate pools, per-channel stats, channel_schedules table, App Home per-channel schedule UI, add-office restaurant seeding
 - Architecture: HTTP layer → Service layer → Client layer (Flask blueprints, psycopg3 connection pool)
 - External integrations: Slack API (OAuth V2, Block Kit), Google Places API, PostgreSQL
 
@@ -102,4 +102,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-04-06 after milestone v1.0 Marketplace Launch definition*
+*Last updated: 2026-04-16 after Phase 07.2 completion*
