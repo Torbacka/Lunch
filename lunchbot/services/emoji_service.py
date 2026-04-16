@@ -44,7 +44,7 @@ def update_database(results, emoji_string):
         logger.info('Updated %d restaurants with emoji %s', count, emoji_string)
 
 
-def search_and_update_emoji(location):
+def search_and_update_emoji(location, location_id=None, team_id=None):
     """Seed the restaurant database from Google Places.
 
     Fetches all restaurants within 700m of location, saves them, then
@@ -52,6 +52,8 @@ def search_and_update_emoji(location):
 
     Args:
         location: 'lat,lng' string (e.g. '59.3419,18.0645')
+        location_id: workspace_locations.id to tag saved restaurants with
+        team_id: workspaces.team_id (tenant), optional
     """
     response = places_client.find_restaurants_nearby(location)
     results = response.get('results', [])
@@ -59,7 +61,7 @@ def search_and_update_emoji(location):
         logger.warning('No restaurants found near %s', location)
         return
 
-    db_client.save_restaurants({'results': results})
+    db_client.save_restaurants({'results': results}, location_id)
     logger.info('Saved %d restaurants near %s', len(results), location)
 
     # Fetch website/url details for each restaurant

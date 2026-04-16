@@ -181,5 +181,5 @@ def seed():
         return 'no location bound for channel', 400
 
     logger.info('Restaurant seed triggered for team_id=%s channel=%s', team_id, channel)
-    emoji_service.search_and_update_emoji(location)
+    emoji_service.search_and_update_emoji(location, location_row['id'], team_id)
     return '', 200

@@ -4,6 +4,7 @@ Handles: /action (vote clicks, suggestion select, App Home buttons, modal submis
          /find_suggestions (external select search).
 """
 import json
+import threading
 import structlog
 from datetime import date, time
 
@@ -18,7 +19,7 @@ from lunchbot.client.workspace_client import (
     set_default_workspace_location,
 )
 from lunchbot.client import slack_client
-from lunchbot.services import vote_service, poll_service
+from lunchbot.services import vote_service, poll_service, seed_service
 from lunchbot.blueprints.polls import (
     CHANNEL_LOC_USE_DEFAULT, CHANNEL_LOC_PICK, CHANNEL_LOC_ADD_OFFICE,
 )
@@ -390,6 +391,15 @@ def _handle_view_submission(payload):
             actor_user_id=user_id, via=via,
         )
 
+        # Seed restaurants for the new office in a background thread
+        app = current_app._get_current_object()
+        thread = threading.Thread(
+            target=seed_service._seed_office_restaurants,
+            args=(app, team_id, row['id'], lat_lng),
+            daemon=True,
+        )
+        thread.start()
+
         if channel_id:
             bind_channel_location(team_id, channel_id, row['id'])
             try:
@@ -466,7 +476,7 @@ def find_suggestions():
         return jsonify({'options': []})
 
     response = places_client.find_suggestion(search_value, location)
-    db_client.save_restaurants(response)
+    db_client.save_restaurants(response, location_row['id'])
 
     options = []
     for result in response.get('results', []):

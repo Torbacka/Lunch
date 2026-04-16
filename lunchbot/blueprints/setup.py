@@ -12,28 +12,16 @@ import logging
 import threading
 
 import structlog
-from flask import Blueprint, request, current_app, g
+from flask import Blueprint, request, current_app
 
 from lunchbot.client import places_client
 from lunchbot.client.workspace_client import get_workspace, create_workspace_location
-from lunchbot.services import emoji_service
+from lunchbot.services import seed_service
 
 logger = structlog.get_logger(__name__)
 _legacy_logger = logging.getLogger(__name__)
 
 bp = Blueprint('setup', __name__, url_prefix='/slack')
-
-
-def _seed_restaurants(app, team_id, location):
-    """Run restaurant seeding inside a pushed app context."""
-    with app.app_context():
-        g.workspace_id = team_id
-        _legacy_logger.info('Background seed started for team_id=%s location=%s', team_id, location)
-        try:
-            emoji_service.search_and_update_emoji(location)
-            _legacy_logger.info('Background seed complete for team_id=%s', team_id)
-        except Exception:
-            _legacy_logger.exception('Background seed failed for team_id=%s', team_id)
 
 
 @bp.route('/setup', methods=['GET'])
@@ -85,8 +73,8 @@ def setup_submit():
 
     app = current_app._get_current_object()
     thread = threading.Thread(
-        target=_seed_restaurants,
-        args=(app, team_id, lat_lng),
+        target=seed_service._seed_office_restaurants,
+        args=(app, team_id, row['id'], lat_lng),
         daemon=True,
     )
     thread.start()
