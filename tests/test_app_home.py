@@ -424,3 +424,47 @@ class TestViewSubmissionRemoveSchedule:
             poll_schedule_weekdays=None,
         )
         mock_remove.assert_called_once_with('T123')
+
+
+# ---------------------------------------------------------------------------
+# Phase 07.2 Plan 07: Per-channel schedule rendering tests
+# ---------------------------------------------------------------------------
+
+class TestBuildHomeViewPerChannelSchedules:
+    """Verify build_home_view renders per-channel schedule rows."""
+
+    def test_build_home_view_renders_per_channel_schedules(self):
+        from lunchbot.services.app_home_service import build_home_view
+        from datetime import time
+        schedules = [
+            {
+                'channel_id': 'C1',
+                'schedule_time': time(12, 0),
+                'schedule_timezone': 'UTC',
+                'schedule_weekdays': 'mon,tue',
+            },
+            {
+                'channel_id': 'C2',
+                'schedule_time': time(13, 0),
+                'schedule_timezone': 'UTC',
+                'schedule_weekdays': 'wed',
+            },
+        ]
+        view = build_home_view({'poll_size': 5}, True, [], schedules)
+        blocks_text = json.dumps(view['blocks'])
+        assert '<#C1>' in blocks_text, "Channel C1 should appear in rendered view"
+        assert '<#C2>' in blocks_text, "Channel C2 should appear in rendered view"
+        assert 'open_schedule_channel_modal' in blocks_text, \
+            "Schedule a channel button should be present"
+        # Legacy single-channel sections must NOT appear
+        assert 'Poll Channel' not in blocks_text
+        assert 'Poll Schedule' not in blocks_text
+
+    def test_build_home_view_no_workspace_schedule_sections(self):
+        from lunchbot.services.app_home_service import build_home_view
+        view = build_home_view({'poll_size': 5}, True, [], [])
+        blocks_text = json.dumps(view['blocks'])
+        assert 'Poll Channel' not in blocks_text, \
+            "Legacy Poll Channel section must not appear"
+        assert 'Poll Schedule' not in blocks_text, \
+            "Legacy Poll Schedule section must not appear"
