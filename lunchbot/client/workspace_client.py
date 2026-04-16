@@ -57,17 +57,17 @@ def get_workspace(team_id):
 def get_workspace_settings(team_id):
     """Get workspace settings for App Home and scheduler.
 
-    Returns dict with poll_channel, schedule fields, poll_size, smart_picks.
-    None if workspace not found or inactive. The legacy `location` column is
-    no longer read -- callers must use list_workspace_locations /
-    get_default_location / resolve_location_for_channel instead.
+    Returns dict with team_id, poll_size, smart_picks.
+    None if workspace not found or inactive.
+
+    Post-migration-009: poll_channel and schedule columns moved to
+    channel_schedules table. Use list_channel_schedules() for those.
+    Location data lives in workspace_locations / channel_locations.
     """
     with get_pool().connection() as conn:
         with conn.cursor(row_factory=dict_row) as cur:
             cur.execute("""
-                SELECT team_id, poll_channel, poll_schedule_time,
-                       poll_schedule_timezone, poll_schedule_weekdays,
-                       poll_size, smart_picks
+                SELECT team_id, poll_size, smart_picks
                 FROM workspaces
                 WHERE team_id = %(team_id)s AND is_active = TRUE
             """, {'team_id': team_id})
@@ -77,11 +77,10 @@ def get_workspace_settings(team_id):
 def update_workspace_settings(team_id, **kwargs):
     """Update workspace settings columns. Only updates keys present in kwargs.
 
-    Valid keys: poll_channel, poll_schedule_time, poll_schedule_timezone,
-    poll_schedule_weekdays, poll_size, smart_picks.
+    Valid keys: poll_size, smart_picks.
+    Post-migration-009: schedule columns moved to channel_schedules table.
     """
-    ALLOWED = {'poll_channel', 'poll_schedule_time', 'poll_schedule_timezone',
-                'poll_schedule_weekdays', 'poll_size', 'smart_picks'}
+    ALLOWED = {'poll_size', 'smart_picks'}
     updates = {k: v for k, v in kwargs.items() if k in ALLOWED}
     if not updates:
         return

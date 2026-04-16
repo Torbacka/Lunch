@@ -22,11 +22,12 @@ def _insert_workspace(conn, team_id='T_TEST', team_name='Test Team'):
 def _insert_workspace_location(conn, team_id, name='Main', lat_lng=None, is_default=True):
     """Insert a workspace_location (office) and return its id."""
     lat_lng = lat_lng or {'lat': 59.0, 'lng': 18.0}
+    lat_lng_str = f"{lat_lng['lat']},{lat_lng['lng']}"
     cur = conn.cursor()
     cur.execute(
-        "INSERT INTO workspace_locations (team_id, name, latitude, longitude, is_default) "
-        "VALUES (%s, %s, %s, %s, %s) RETURNING id",
-        (team_id, name, lat_lng['lat'], lat_lng['lng'], is_default),
+        "INSERT INTO workspace_locations (team_id, name, lat_lng, is_default) "
+        "VALUES (%s, %s, %s, %s) RETURNING id",
+        (team_id, name, lat_lng_str, is_default),
     )
     return cur.fetchone()[0]
 

@@ -181,13 +181,13 @@ Plans:
 **Plans**: 8 plans
 
 Plans:
-- [ ] 07.2-01-PLAN.md -- Alembic migration 009 (restaurants.location_id, restaurant_stats re-key, channel_schedules, polls NOT NULL, drop workspace schedule cols)
-- [ ] 07.2-02-PLAN.md -- db_client rewrite: upsert_suggestion + get_candidate_pool + per-channel stats + channel_schedules CRUD
-- [ ] 07.2-03-PLAN.md -- Shared seed_service helper + install/add-office/find_suggestions location_id threading
-- [ ] 07.2-04-PLAN.md -- scheduler_service channel-keyed jobs from channel_schedules
-- [ ] 07.2-05-PLAN.md -- recommendation_service + poll_service channel_id threading through ensure_poll_options and update_stats_lazy
-- [ ] 07.2-06-PLAN.md -- App Home per-channel schedule list + Schedule-a-channel modal + list_bot_channels wrapper
-- [ ] 07.2-07-PLAN.md -- Regression test suite (G-01 isolation, G-02 divergence, migration 009 invariants, scheduler, App Home, channel picker)
+- [x] 07.2-01-PLAN.md -- Alembic migration 009 (restaurants.location_id, restaurant_stats re-key, channel_schedules, polls NOT NULL, drop workspace schedule cols)
+- [x] 07.2-02-PLAN.md -- db_client rewrite: upsert_suggestion + get_candidate_pool + per-channel stats + channel_schedules CRUD
+- [x] 07.2-03-PLAN.md -- Shared seed_service helper + install/add-office/find_suggestions location_id threading
+- [x] 07.2-04-PLAN.md -- scheduler_service channel-keyed jobs from channel_schedules
+- [x] 07.2-05-PLAN.md -- recommendation_service + poll_service channel_id threading through ensure_poll_options and update_stats_lazy
+- [x] 07.2-06-PLAN.md -- App Home per-channel schedule list + Schedule-a-channel modal + list_bot_channels wrapper
+- [x] 07.2-07-PLAN.md -- Regression test suite (G-01 isolation, G-02 divergence, migration 009 invariants, scheduler, App Home, channel picker)
 - [ ] 07.2-08-PLAN.md -- [BLOCKING] alembic upgrade head + full test suite on migrated DB
 
 ### Phase 8: Marketplace Submission

@@ -10,7 +10,6 @@ from flask import current_app
 
 from lunchbot.client import db_client
 from lunchbot.client import slack_client
-from lunchbot.client.workspace_client import get_workspace_settings
 from lunchbot.services.recommendation_service import ensure_poll_options
 
 logger = structlog.get_logger(__name__)
@@ -235,15 +234,17 @@ def build_poll_message(channel, team_id, trigger_source='manual'):
 
 
 def poll_channel_for(team_id):
-    """Get the poll channel for a workspace. DB value overrides env var (per D-05).
+    """Legacy fallback: return config-level poll channel.
+
+    Post-migration-009: poll_channel moved to channel_schedules table.
+    The scheduler now calls run_poll with an explicit channel_id from the
+    schedule row. This function exists only as a last-resort fallback for
+    callers that don't yet have a channel_id.
 
     Args:
-        team_id: Slack team ID for workspace lookup
+        team_id: Slack team ID (unused post-009, kept for API compat)
 
     Returns:
-        Channel string from workspace DB row, or config fallback, or empty string
+        Config-level poll channel or empty string
     """
-    settings = get_workspace_settings(team_id)
-    if settings and settings.get('poll_channel'):
-        return settings['poll_channel']
     return current_app.config.get('SLACK_POLL_CHANNEL', '')

@@ -35,16 +35,41 @@ _skip_no_app_role = pytest.mark.skipif(
 )
 
 
+def _ensure_workspace_location(conn, team_id, team_name='Test'):
+    """Insert workspace + default location, return location_id."""
+    conn.execute(
+        "INSERT INTO workspaces (team_id, team_name, bot_token_encrypted) "
+        "VALUES (%(tid)s, %(tn)s, 'enc') ON CONFLICT DO NOTHING",
+        {'tid': team_id, 'tn': team_name},
+    )
+    cur = conn.cursor()
+    cur.execute(
+        "INSERT INTO workspace_locations (team_id, name, lat_lng, is_default) "
+        "VALUES (%(tid)s, 'HQ', '59.0,18.0', TRUE) "
+        "ON CONFLICT DO NOTHING RETURNING id",
+        {'tid': team_id},
+    )
+    row = cur.fetchone()
+    if row:
+        return row[0]
+    cur.execute(
+        "SELECT id FROM workspace_locations WHERE team_id = %(tid)s LIMIT 1",
+        {'tid': team_id},
+    )
+    return cur.fetchone()[0]
+
+
 @_skip_no_app_role
 @pytest.mark.db
 def test_tenant_isolation_restaurants(app, clean_all_tables, tenant_connection, workspace_a, workspace_b):
     """Tenant A inserts restaurant; tenant B cannot see it via app role; tenant A can."""
     # Insert as tenant A (superuser connection -- bypasses RLS for setup)
     with tenant_connection(workspace_a['team_id']) as conn:
+        loc_id = _ensure_workspace_location(conn, workspace_a['team_id'], workspace_a['team_name'])
         conn.execute("""
-            INSERT INTO restaurants (place_id, name, workspace_id)
-            VALUES ('ChIJalpha001', 'Alpha Bistro', %(wid)s)
-        """, {'wid': workspace_a['team_id']})
+            INSERT INTO restaurants (place_id, name, workspace_id, location_id)
+            VALUES ('ChIJalpha001', 'Alpha Bistro', %(wid)s, %(lid)s)
+        """, {'wid': workspace_a['team_id'], 'lid': loc_id})
 
     # Query as tenant B using app role (subject to RLS) -- expect 0 results
     with psycopg.connect(APP_DB_URL) as conn:
@@ -76,9 +101,10 @@ def test_tenant_isolation_polls(app, clean_all_tables, tenant_connection, worksp
 
     # Insert poll as tenant A (superuser for setup)
     with tenant_connection(workspace_a['team_id']) as conn:
+        _ensure_workspace_location(conn, workspace_a['team_id'], workspace_a['team_name'])
         conn.execute("""
-            INSERT INTO polls (poll_date, workspace_id)
-            VALUES (%(poll_date)s, %(wid)s)
+            INSERT INTO polls (poll_date, workspace_id, slack_channel_id)
+            VALUES (%(poll_date)s, %(wid)s, 'C_TEST')
         """, {'poll_date': poll_date, 'wid': workspace_a['team_id']})
 
     # Query as tenant B via app role -- expect 0 results
@@ -104,18 +130,20 @@ def test_tenant_isolation_poll_options_and_votes(app, clean_all_tables, tenant_c
         conn.autocommit = True
         conn.execute(f"SET app.current_tenant = '{workspace_a['team_id']}'")
 
+        loc_id = _ensure_workspace_location(conn, workspace_a['team_id'], workspace_a['team_name'])
+
         conn.execute("""
-            INSERT INTO restaurants (place_id, name, workspace_id)
-            VALUES ('ChIJalpha_opt', 'Alpha Options', %(wid)s)
-        """, {'wid': workspace_a['team_id']})
+            INSERT INTO restaurants (place_id, name, workspace_id, location_id)
+            VALUES ('ChIJalpha_opt', 'Alpha Options', %(wid)s, %(lid)s)
+        """, {'wid': workspace_a['team_id'], 'lid': loc_id})
 
         with conn.cursor(row_factory=dict_row) as cur:
             cur.execute("SELECT id FROM restaurants WHERE place_id = 'ChIJalpha_opt'")
             restaurant_id = cur.fetchone()['id']
 
         conn.execute("""
-            INSERT INTO polls (poll_date, workspace_id)
-            VALUES (%(poll_date)s, %(wid)s)
+            INSERT INTO polls (poll_date, workspace_id, slack_channel_id)
+            VALUES (%(poll_date)s, %(wid)s, 'C_TEST')
         """, {'poll_date': poll_date, 'wid': workspace_a['team_id']})
 
         with conn.cursor(row_factory=dict_row) as cur:
@@ -156,10 +184,11 @@ def test_fail_closed_no_tenant(app, clean_all_tables, tenant_connection, workspa
     """No tenant context returns empty results via app role (fail-closed behavior)."""
     # Insert restaurant as superuser with tenant context
     with tenant_connection(workspace_a['team_id']) as conn:
+        loc_id = _ensure_workspace_location(conn, workspace_a['team_id'], workspace_a['team_name'])
         conn.execute("""
-            INSERT INTO restaurants (place_id, name, workspace_id)
-            VALUES ('ChIJfailclosed', 'Fail Closed Cafe', %(wid)s)
-        """, {'wid': workspace_a['team_id']})
+            INSERT INTO restaurants (place_id, name, workspace_id, location_id)
+            VALUES ('ChIJfailclosed', 'Fail Closed Cafe', %(wid)s, %(lid)s)
+        """, {'wid': workspace_a['team_id'], 'lid': loc_id})
 
     # Open app role connection WITHOUT setting app.current_tenant
     with psycopg.connect(APP_DB_URL) as conn:

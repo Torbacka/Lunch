@@ -103,5 +103,5 @@ class TestSeedEndpoint:
         response = client.get('/seed?team_id=T_TEST&channel=C_TEST')
 
         assert response.status_code == 200
-        mock_emoji.search_and_update_emoji.assert_called_once_with('59.3419,18.0645')
+        mock_emoji.search_and_update_emoji.assert_called_once_with('59.3419,18.0645', 1, 'T_TEST')
         mock_resolve.assert_called_once_with('T_TEST', 'C_TEST')

@@ -16,8 +16,8 @@ def _ensure_workspace_and_location(app):
         )
         cur = conn.cursor()
         cur.execute(
-            "INSERT INTO workspace_locations (team_id, name, latitude, longitude, is_default) "
-            "VALUES ('T_TEST', 'HQ', 59.0, 18.0, TRUE) "
+            "INSERT INTO workspace_locations (team_id, name, lat_lng, is_default) "
+            "VALUES ('T_TEST', 'HQ', '59.0,18.0', TRUE) "
             "ON CONFLICT DO NOTHING RETURNING id"
         )
         row = cur.fetchone()

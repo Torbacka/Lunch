@@ -56,14 +56,11 @@ class TestGetWorkspaceSettings:
             result = get_workspace_settings('T_SETTINGS')
             assert result is not None
             assert result['team_id'] == 'T_SETTINGS'
-            assert 'poll_channel' in result
-            assert 'poll_schedule_time' in result
-            assert 'poll_schedule_timezone' in result
-            assert 'poll_schedule_weekdays' in result
             assert 'poll_size' in result
             assert 'smart_picks' in result
-            # Phase 07.1 plan 03 (migration 008) drops workspaces.location; the
-            # get_workspace_settings payload no longer exposes the column.
+            # Post-migration-009: schedule/channel columns moved to channel_schedules
+            assert 'poll_channel' not in result
+            assert 'poll_schedule_time' not in result
             assert 'location' not in result
 
     def test_returns_none_for_missing_workspace(self, app, clean_all_tables):
@@ -77,9 +74,6 @@ class TestGetWorkspaceSettings:
             from lunchbot.client.workspace_client import save_workspace, get_workspace_settings
             save_workspace('T_FRESH', 'Fresh Team', 'enc_token', 'U_BOT', 'chat:write')
             result = get_workspace_settings('T_FRESH')
-            assert result['poll_schedule_time'] is None
-            assert result['poll_schedule_timezone'] is None
-            assert result['poll_schedule_weekdays'] is None
             assert result['poll_size'] is None
             assert result['smart_picks'] is None
 
@@ -103,23 +97,16 @@ class TestUpdateWorkspaceSettings:
             result = get_workspace_settings('T_UPD')
             assert result['poll_size'] == 6
             assert result['smart_picks'] == 3
-            # Other fields should remain None
-            assert result['poll_schedule_time'] is None
 
-    def test_clears_schedule_when_set_to_none(self, app, clean_all_tables):
+    def test_updates_poll_size_independently(self, app, clean_all_tables):
         with app.app_context():
             from lunchbot.client.workspace_client import save_workspace, get_workspace_settings, update_workspace_settings
-            from datetime import time
             save_workspace('T_CLR', 'Clear Team', 'enc_token', 'U_BOT', 'chat:write')
-            update_workspace_settings('T_CLR', poll_schedule_time=time(11, 30), poll_schedule_timezone='Europe/Stockholm')
+            update_workspace_settings('T_CLR', poll_size=7)
             result = get_workspace_settings('T_CLR')
-            assert result['poll_schedule_time'] is not None
-            # Now clear it
-            update_workspace_settings('T_CLR', poll_schedule_time=None)
-            result = get_workspace_settings('T_CLR')
-            assert result['poll_schedule_time'] is None
-            # Timezone should still be set since we only cleared time
-            assert result['poll_schedule_timezone'] == 'Europe/Stockholm'
+            assert result['poll_size'] == 7
+            # smart_picks should remain None since we only set poll_size
+            assert result['smart_picks'] is None
 
     def test_rejects_disallowed_columns(self, app, clean_all_tables):
         """Columns not in ALLOWED set should be silently ignored (security: T-05-01)."""

@@ -22,8 +22,8 @@ def test_upgrade_head():
     assert result.returncode == 0, f"upgrade failed: {result.stdout}{result.stderr}"
 
 
-def test_downgrade_base():
-    """INFRA-04: alembic downgrade base succeeds."""
+def test_downgrade_to_008():
+    """INFRA-04: alembic downgrade to 008 succeeds (009 is forward-only, downgrade raises)."""
     # First ensure we're at head
     subprocess.run(
         ['alembic', 'upgrade', 'head'],
@@ -31,16 +31,19 @@ def test_downgrade_base():
         capture_output=True,
         env=ALEMBIC_ENV,
     )
+    # Migration 009 is forward-only (downgrade raises NotImplementedError).
+    # Verify that downgrade to 008 correctly fails.
     result = subprocess.run(
-        ['alembic', 'downgrade', 'base'],
+        ['alembic', 'downgrade', '008'],
         cwd=PROJECT_ROOT,
         capture_output=True,
         text=True,
         env=ALEMBIC_ENV,
     )
-    assert result.returncode == 0, f"downgrade failed: {result.stdout}{result.stderr}"
+    assert result.returncode != 0, "009 is forward-only; downgrade should fail"
+    assert 'NotImplementedError' in result.stderr or 'forward-only' in result.stderr
 
-    # Restore to head for other tests
+    # Ensure we're still at head for other tests
     subprocess.run(
         ['alembic', 'upgrade', 'head'],
         cwd=PROJECT_ROOT,
@@ -65,4 +68,4 @@ def test_migration_current_shows_head():
         env=ALEMBIC_ENV,
     )
     assert result.returncode == 0
-    assert '008' in result.stdout, f"Expected revision 008 in: {result.stdout}"
+    assert '009' in result.stdout, f"Expected revision 009 in: {result.stdout}"

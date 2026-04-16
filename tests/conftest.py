@@ -41,21 +41,21 @@ def clean_tables(app):
 
 @pytest.fixture
 def clean_all_tables(app):
-    """Truncate all tables including workspaces."""
+    """Truncate all tables including workspaces and channel_schedules."""
     with app.app_context():
         pool = app.extensions['pool']
         with pool.connection() as conn:
-            conn.execute("TRUNCATE votes, poll_options, polls, restaurants, workspaces RESTART IDENTITY CASCADE")
+            conn.execute("TRUNCATE votes, poll_options, polls, restaurants, workspaces, channel_schedules RESTART IDENTITY CASCADE")
         yield
 
 
 @pytest.fixture
 def clean_all_tables_with_stats(app):
-    """Truncate all tables including workspaces and restaurant_stats."""
+    """Truncate all tables including workspaces, restaurant_stats, and channel_schedules."""
     with app.app_context():
         pool = app.extensions['pool']
         with pool.connection() as conn:
-            conn.execute("TRUNCATE votes, poll_options, polls, restaurants, workspaces, restaurant_stats RESTART IDENTITY CASCADE")
+            conn.execute("TRUNCATE votes, poll_options, polls, restaurants, workspaces, restaurant_stats, channel_schedules RESTART IDENTITY CASCADE")
         yield
 
 
