@@ -178,7 +178,7 @@ Plans:
   6. APScheduler jobs are keyed `poll_{team_id}_{channel_id}`; `scheduler_service.load_all_schedules` / `update_schedule_job` read and write `channel_schedules`; the workspace-level schedule path is removed
   7. App Home shows a per-channel schedule list with Edit / Add-schedule affordances; the Add-schedule modal's channel picker only lists channels the bot is a member of; the legacy workspace-level "Poll Channel" and "Poll Schedule" sections are removed
   8. Regression tests cover: two-office candidate isolation (G-01), same-office two-channel stats divergence (G-02), channel_schedules migration of an existing workspace-level schedule, and the end-to-end scheduled poll path with per-channel attribution
-**Plans**: 8 plans
+**Plans**: 9 plans
 
 Plans:
 - [x] 07.2-01-PLAN.md -- Alembic migration 009 (restaurants.location_id, restaurant_stats re-key, channel_schedules, polls NOT NULL, drop workspace schedule cols)
@@ -188,7 +188,8 @@ Plans:
 - [x] 07.2-05-PLAN.md -- recommendation_service + poll_service channel_id threading through ensure_poll_options and update_stats_lazy
 - [x] 07.2-06-PLAN.md -- App Home per-channel schedule list + Schedule-a-channel modal + list_bot_channels wrapper
 - [x] 07.2-07-PLAN.md -- Regression test suite (G-01 isolation, G-02 divergence, migration 009 invariants, scheduler, App Home, channel picker)
-- [ ] 07.2-08-PLAN.md -- [BLOCKING] alembic upgrade head + full test suite on migrated DB
+- [x] 07.2-08-PLAN.md -- [BLOCKING] alembic upgrade head + full test suite on migrated DB
+- [ ] 07.2-09-PLAN.md -- [GAP CLOSURE] Fix save_restaurants missing location_id + wire seed_service in add-office modal + update test
 
 ### Phase 8: Marketplace Submission
 **Goal**: LunchBot passes Slack App Directory review and is listed for public installation
