@@ -127,6 +127,7 @@ class TestSuggestFunction:
         payload = {
             'type': 'block_actions',
             'team': {'id': 'T123'},
+            'channel': {'id': 'C123'},
             'actions': [{
                 'type': 'external_select',
                 'selected_option': {'value': 'ChIJ_abc'},
@@ -138,7 +139,7 @@ class TestSuggestFunction:
 
         assert response.status_code == 200
         mock_db.get_restaurant_by_place_id.assert_called_once_with('ChIJ_abc')
-        mock_db.upsert_suggestion.assert_called_once_with(date.today(), 5)
+        mock_db.upsert_suggestion.assert_called_once_with(date.today(), 5, 'T123', 'C123')
 
     @patch('lunchbot.blueprints.slack_actions.db_client')
     @patch('lunchbot.blueprints.slack_actions.places_client')

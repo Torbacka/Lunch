@@ -11,7 +11,9 @@ import numpy as np
 from flask import current_app, g
 
 from lunchbot.client import db_client
-from lunchbot.client.workspace_client import get_workspace_settings
+from lunchbot.client.workspace_client import (
+    get_workspace_settings, resolve_location_for_channel,
+)
 from lunchbot.services.cuisine_map import classify_cuisine
 from lunchbot.services.distance import estimate_walking_minutes
 
@@ -170,7 +172,7 @@ def ensure_poll_options(poll_date, workspace_id, channel_id):
     update_stats_lazy(today=poll_date)
 
     # Step 2: Get existing manual additions
-    existing = db_client.get_votes(poll_date)
+    existing = db_client.get_votes(poll_date, channel_id)
     existing_count = len(existing)
 
     remaining_slots = max(0, poll_size - existing_count)
@@ -196,8 +198,8 @@ def ensure_poll_options(poll_date, workspace_id, channel_id):
         candidates, random_count, exclude_ids=smart_ids
     )
 
-    # Resolve workspace location for walking distance
-    origin_lat, origin_lon = _parse_location(workspace_id)
+    # Resolve channel office for walking distance.
+    origin_lat, origin_lon = _parse_channel_location(workspace_id, channel_id)
 
     # Step 6: Add all picks to today's poll with metadata
     added = 0
@@ -218,12 +220,12 @@ def ensure_poll_options(poll_date, workspace_id, channel_id):
     return added
 
 
-def _parse_location(workspace_id):
-    """Parse workspace location string into (lat, lon) floats."""
-    if not workspace_id:
+def _parse_channel_location(workspace_id, channel_id):
+    """Parse the channel-bound office location into (lat, lon) floats."""
+    if not workspace_id or not channel_id:
         return None, None
-    settings = get_workspace_settings(workspace_id)
-    loc = (settings or {}).get('location', '')
+    location = resolve_location_for_channel(workspace_id, channel_id)
+    loc = (location or {}).get('lat_lng', '')
     if not loc or ',' not in loc:
         return None, None
     parts = loc.split(',')

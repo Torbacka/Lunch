@@ -288,11 +288,13 @@ class TestPushPoll:
                 from lunchbot.services.poll_service import push_poll
                 result = push_poll('#lunch', 'T_TEST')
 
-                mock_db.get_votes.assert_called_once_with(date.today())
+                mock_db.get_votes.assert_called_once_with(date.today(), '#lunch')
                 mock_slack.post_message.assert_called_once()
                 call_args = mock_slack.post_message.call_args
                 assert call_args[0][0] == '#lunch'
                 assert call_args[0][2] == 'T_TEST'
+                assert call_args.kwargs['unfurl_links'] is False
+                assert call_args.kwargs['unfurl_media'] is False
                 assert result == {'ok': True, 'ts': '111.222'}
 
 

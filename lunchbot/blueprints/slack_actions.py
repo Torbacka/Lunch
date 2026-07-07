@@ -55,7 +55,7 @@ _APP_HOME_ACTIONS = frozenset({
 })
 
 
-def suggest(place_id):
+def suggest(place_id, team_id, channel_id):
     """Add a restaurant as a poll option for today.
 
     Fetches restaurant from DB by place_id. If url is missing, fetches
@@ -73,7 +73,7 @@ def suggest(place_id):
             result.get('website', ''),
         )
     if restaurant:
-        db_client.upsert_suggestion(date.today(), restaurant['id'])
+        db_client.upsert_suggestion(date.today(), restaurant['id'], team_id, channel_id)
 
 
 @bp.route('/action', methods=['POST'])
@@ -247,7 +247,11 @@ def _handle_legacy_action(payload, first_action):
         selected = first_action.get('selected_option', {})
         place_id = selected.get('value', '')
         logger.info('suggestion_selected', place_id=place_id)
-        suggest(place_id)
+        if not place_id:
+            return '', 200
+        team_id = payload.get('team', {}).get('id') or getattr(g, 'workspace_id', None)
+        channel_id = payload.get('channel', {}).get('id', '')
+        suggest(place_id, team_id, channel_id)
     return '', 200
 
 

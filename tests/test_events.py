@@ -20,8 +20,8 @@ def test_url_verification_challenge(client):
         content_type='application/json',
     )
     assert response.status_code == 200
-    data = response.get_json()
-    assert data == {'challenge': 'abc123'}
+    assert response.content_type == 'text/plain'
+    assert response.get_data(as_text=True) == 'abc123'
 
 
 # ---------------------------------------------------------------------------

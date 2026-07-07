@@ -73,7 +73,7 @@ class TestVoteService:
             vote(SAMPLE_PAYLOAD)
 
             mock_db.toggle_vote.assert_called_once_with(42, 'U456')
-            mock_db.get_votes.assert_called_once_with(date.today())
+            mock_db.get_votes.assert_called_once_with(date.today(), 'C123')
             mock_slack.update_message.assert_called_once()
             call_args = mock_slack.update_message.call_args
             assert call_args[0][0] == 'C123'

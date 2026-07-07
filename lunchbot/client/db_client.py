@@ -14,8 +14,8 @@ from lunchbot.db import get_pool, execute_with_tenant
 logger = logging.getLogger(__name__)
 
 
-def get_votes(poll_date):
-    """Get all poll options with votes for a given date.
+def get_votes(poll_date, slack_channel_id=None):
+    """Get poll options with votes for a given date, optionally scoped to a channel.
     Replaces mongo_client.get_votes().
     Returns list of dicts with keys: id, restaurant_id, place_id, name, rating,
     emoji, url, cuisine, walking_minutes, pick_type, votes (list of user_id strings).
@@ -33,9 +33,10 @@ def get_votes(poll_date):
         JOIN polls p ON p.id = po.poll_id
         LEFT JOIN votes v ON v.poll_option_id = po.id
         WHERE p.poll_date = %(poll_date)s
+          AND (%(slack_channel_id)s::varchar IS NULL OR p.slack_channel_id = %(slack_channel_id)s)
         GROUP BY po.id, r.id
         ORDER BY po.display_order
-    """, {'poll_date': poll_date})
+    """, {'poll_date': poll_date, 'slack_channel_id': slack_channel_id})
 
 
 def get_all_votes():
@@ -93,11 +94,11 @@ def upsert_suggestion(poll_date, restaurant_id, workspace_id, slack_channel_id,
         if workspace_id:
             conn.execute(f"SET app.current_tenant = '{workspace_id}'")
         with conn.cursor(row_factory=dict_row) as cur:
-            # Upsert poll for this date with slack_channel_id
+            # Upsert poll for this date and channel.
             cur.execute("""
                 INSERT INTO polls (poll_date, workspace_id, slack_channel_id)
                 VALUES (%(poll_date)s, %(workspace_id)s, %(slack_channel_id)s)
-                ON CONFLICT (poll_date, workspace_id) DO UPDATE SET
+                ON CONFLICT (poll_date, workspace_id, slack_channel_id) DO UPDATE SET
                     slack_channel_id = EXCLUDED.slack_channel_id
                 RETURNING id
             """, {
@@ -309,6 +310,7 @@ def get_candidate_pool(poll_date, channel_id):
               FROM poll_options po
               JOIN polls p ON p.id = po.poll_id
               WHERE p.poll_date = %(poll_date)s
+                AND p.slack_channel_id = %(channel_id)s
           )
         ORDER BY r.name
     """, {'poll_date': poll_date, 'channel_id': channel_id})
@@ -403,8 +405,8 @@ def mark_poll_stats_processed(poll_id):
     """, {'poll_id': poll_id}, fetch='one')
 
 
-def get_poll_winner(poll_date):
-    """Get the top-voted restaurant for a given poll date.
+def get_poll_winner(poll_date, slack_channel_id=None):
+    """Get the top-voted restaurant for a given poll date and optional channel.
     Returns dict with name, emoji, vote_count, or None if no votes.
     Ties broken by display_order (first option wins).
     """
@@ -417,11 +419,12 @@ def get_poll_winner(poll_date):
         JOIN polls p ON p.id = po.poll_id
         LEFT JOIN votes v ON v.poll_option_id = po.id
         WHERE p.poll_date = %(poll_date)s
+          AND (%(slack_channel_id)s::varchar IS NULL OR p.slack_channel_id = %(slack_channel_id)s)
         GROUP BY po.id, r.id
         HAVING COUNT(v.id) > 0
         ORDER BY vote_count DESC, po.display_order ASC
         LIMIT 1
-    """, {'poll_date': poll_date}, fetch='one')
+    """, {'poll_date': poll_date, 'slack_channel_id': slack_channel_id}, fetch='one')
 
 
 # --- Channel Schedules CRUD (D-12, D-13) ---

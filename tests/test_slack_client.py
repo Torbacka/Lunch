@@ -86,7 +86,30 @@ class TestPostMessage:
                 assert json_body['channel'] == '#general'
                 assert json_body['blocks'] == [{'type': 'section'}]
                 assert json_body['text'] == 'hello'
+                assert json_body['unfurl_links'] is True
+                assert json_body['unfurl_media'] is True
                 assert result == {'ok': True, 'ts': '1234.5678'}
+
+    def test_can_disable_unfurls(self, app, mock_workspace_active, fernet_key, encrypted_token):
+        mock_workspace_active['bot_token_encrypted'] = encrypted_token
+        app.config['FERNET_KEY'] = fernet_key
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = {'ok': True, 'ts': '1234.5678'}
+
+        with app.app_context():
+            with patch('lunchbot.client.slack_client.get_workspace', return_value=mock_workspace_active), \
+                 patch('lunchbot.client.slack_client.session') as mock_session:
+                mock_session.post.return_value = mock_response
+                from lunchbot.client.slack_client import post_message
+                post_message(
+                    '#general', [{'type': 'section'}], 'T_TEST',
+                    unfurl_links=False, unfurl_media=False,
+                )
+
+                json_body = mock_session.post.call_args[1]['json']
+                assert json_body['unfurl_links'] is False
+                assert json_body['unfurl_media'] is False
 
 
 class TestUpdateMessage:

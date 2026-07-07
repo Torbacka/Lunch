@@ -52,7 +52,7 @@ def _form_headers(token):
     }
 
 
-def post_message(channel, blocks, team_id, text=''):
+def post_message(channel, blocks, team_id, text='', unfurl_links=True, unfurl_media=True):
     """Post a message to a Slack channel.
 
     Args:
@@ -60,6 +60,8 @@ def post_message(channel, blocks, team_id, text=''):
         blocks: List of Block Kit block dicts
         team_id: Slack team ID for workspace token resolution
         text: Fallback text for notifications
+        unfurl_links: Whether Slack should expand links into previews
+        unfurl_media: Whether Slack should expand media links into previews
 
     Returns:
         Slack API response as dict
@@ -68,7 +70,13 @@ def post_message(channel, blocks, team_id, text=''):
     response = session.post(
         SLACK_API + "chat.postMessage",
         headers=_headers(token),
-        json={'channel': channel, 'blocks': blocks, 'text': text}
+        json={
+            'channel': channel,
+            'blocks': blocks,
+            'text': text,
+            'unfurl_links': unfurl_links,
+            'unfurl_media': unfurl_media,
+        }
     )
     resp_json = response.json()
     if not resp_json.get('ok'):

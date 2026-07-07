@@ -63,7 +63,8 @@ def _insert_poll(conn, workspace_id, slack_channel_id, poll_date=None):
         cur.execute(
             """INSERT INTO polls (poll_date, workspace_id, slack_channel_id)
                VALUES (%s, %s, %s)
-               ON CONFLICT (poll_date, workspace_id) DO UPDATE SET poll_date = EXCLUDED.poll_date
+               ON CONFLICT (poll_date, workspace_id, slack_channel_id)
+               DO UPDATE SET slack_channel_id = EXCLUDED.slack_channel_id
                RETURNING id""",
             (poll_date, workspace_id, slack_channel_id)
         )
@@ -239,6 +240,8 @@ def test_get_candidate_pool_uses_coalesce_defaults(app_context, clean_all_tables
 
 def test_get_candidate_pool_office_isolation(app_context, clean_all_tables_with_stats, tenant_connection, workspace_a):
     """G-01: Two channels bound to different offices must have disjoint candidate pools."""
+    from flask import g
+
     workspace_id = workspace_a['team_id']
     today = date.today()
 
@@ -262,6 +265,7 @@ def test_get_candidate_pool_office_isolation(app_context, clean_all_tables_with_
         _insert_restaurant(conn, workspace_id, loc_b, place_id='pb_1', name='B Rest 1')
         _insert_restaurant(conn, workspace_id, loc_b, place_id='pb_2', name='B Rest 2')
 
+    g.workspace_id = workspace_id
     pool_a = db_client.get_candidate_pool(today, 'C_A')
     pool_b = db_client.get_candidate_pool(today, 'C_B')
 
@@ -271,6 +275,57 @@ def test_get_candidate_pool_office_isolation(app_context, clean_all_tables_with_
     assert len(ids_a) == 2, f"Expected 2 restaurants in pool A, got {len(ids_a)}"
     assert len(ids_b) == 2, f"Expected 2 restaurants in pool B, got {len(ids_b)}"
     assert ids_a.isdisjoint(ids_b), "G-01 violated: pools overlap across offices"
+
+
+def test_ensure_poll_options_keeps_same_day_channel_polls_office_scoped(
+    app_context, clean_all_tables_with_stats, tenant_connection, workspace_a,
+):
+    """Regression: same-day polls in different office-bound channels must not share options."""
+    from flask import g
+    from lunchbot.services.recommendation_service import ensure_poll_options
+
+    workspace_id = workspace_a['team_id']
+    today = date.today()
+
+    with tenant_connection(workspace_id) as conn:
+        _insert_workspace(conn, workspace_id)
+        conn.execute(
+            "UPDATE workspaces SET poll_size = 2, smart_picks = 0 WHERE team_id = %s",
+            (workspace_id,),
+        )
+
+        loc_a = _insert_workspace_location(conn, workspace_id, name='Office A',
+                                           lat_lng={'lat': 59.0, 'lng': 18.0}, is_default=True)
+        loc_b = _insert_workspace_location(conn, workspace_id, name='Office B',
+                                           lat_lng={'lat': 57.0, 'lng': 16.0}, is_default=False)
+        _insert_channel_location(conn, workspace_id, 'C_A_POLL', loc_a)
+        _insert_channel_location(conn, workspace_id, 'C_B_POLL', loc_b)
+
+        _insert_restaurant(conn, workspace_id, loc_a, place_id='poll_a_1', name='A Poll 1')
+        _insert_restaurant(conn, workspace_id, loc_a, place_id='poll_a_2', name='A Poll 2')
+        _insert_restaurant(conn, workspace_id, loc_b, place_id='poll_b_1', name='B Poll 1')
+        _insert_restaurant(conn, workspace_id, loc_b, place_id='poll_b_2', name='B Poll 2')
+
+    g.workspace_id = workspace_id
+    assert ensure_poll_options(today, workspace_id, 'C_A_POLL') == 2
+    assert ensure_poll_options(today, workspace_id, 'C_B_POLL') == 2
+
+    votes_a = db_client.get_votes(today, 'C_A_POLL')
+    votes_b = db_client.get_votes(today, 'C_B_POLL')
+    names_a = {row['name'] for row in votes_a}
+    names_b = {row['name'] for row in votes_b}
+
+    assert names_a == {'A Poll 1', 'A Poll 2'}
+    assert names_b == {'B Poll 1', 'B Poll 2'}
+    assert names_a.isdisjoint(names_b)
+
+    with tenant_connection(workspace_id) as conn:
+        cur = conn.cursor()
+        cur.execute(
+            "SELECT COUNT(*) FROM polls WHERE poll_date = %s AND workspace_id = %s",
+            (today, workspace_id),
+        )
+        assert cur.fetchone()[0] == 2
 
 
 # ---------------------------------------------------------------------------

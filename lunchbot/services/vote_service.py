@@ -91,7 +91,7 @@ def vote(payload):
     logger.info('Vote %s: option=%s user=%s', result, poll_option_id, user_id)
 
     # Fetch fresh data from DB (T-03-11: never use payload blocks)
-    options = db_client.get_votes(date.today())
+    options = db_client.get_votes(date.today(), channel)
 
     # Enrich options with voter avatar elements
     for option in options:

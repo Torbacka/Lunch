@@ -143,7 +143,7 @@ def close_poll(channel, team_id):
         Slack API response dict, or None if no votes were cast.
     """
     from datetime import date as _date
-    winner = db_client.get_poll_winner(_date.today())
+    winner = db_client.get_poll_winner(_date.today(), channel)
     if not winner:
         blocks = [{
             'type': 'section',
@@ -217,10 +217,12 @@ def push_poll(channel, team_id, trigger_source='manual'):
     """
     logger.info('poll_building', channel=channel, team_id=team_id, trigger_source=trigger_source)
     ensure_poll_options(poll_date=date.today(), workspace_id=team_id, channel_id=channel)
-    options = db_client.get_votes(date.today())
+    options = db_client.get_votes(date.today(), channel)
     logger.info('poll_posting', channel=channel, team_id=team_id, restaurant_count=len(options), trigger_source=trigger_source)
     blocks = build_poll_blocks(options)
-    result = slack_client.post_message(channel, blocks, team_id)
+    result = slack_client.post_message(
+        channel, blocks, team_id, unfurl_links=False, unfurl_media=False,
+    )
     try:
         current_app.extensions['prom_polls_posted'].labels(workspace_id=team_id).inc()
     except (KeyError, RuntimeError):

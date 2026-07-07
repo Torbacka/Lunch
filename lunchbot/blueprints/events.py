@@ -10,12 +10,13 @@ Both app_uninstalled and tokens_revoked call deactivate_workspace (idempotent).
 app_home_opened builds and publishes the App Home view (T-05-06: admin gating).
 """
 import logging
-from flask import Blueprint, request, jsonify
 
+from flask import Blueprint, request
+
+from lunchbot.client import slack_client, db_client
 from lunchbot.client.workspace_client import (
     deactivate_workspace, get_workspace_settings, list_workspace_locations,
 )
-from lunchbot.client import slack_client, db_client
 from lunchbot.services.app_home_service import build_home_view
 
 logger = logging.getLogger(__name__)
@@ -51,7 +52,7 @@ def events():
 
     # Slack URL verification challenge
     if data.get('type') == 'url_verification':
-        return jsonify({'challenge': data.get('challenge', '')})
+        return data.get('challenge', ''), 200, {'Content-Type': 'text/plain'}
 
     event = data.get('event', {})
     event_type = event.get('type')
