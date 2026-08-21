@@ -1,0 +1,20 @@
+services:
+  postgres:
+    environment:
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-dev}
+    ports:
+      - "127.0.0.1:5433:5432"
+
+  app-blue:
+    env_file: !override
+      - ./.env
+    environment:
+      DATABASE_URL: postgresql://lunchbot:${POSTGRES_PASSWORD:-dev}@postgres:5432/lunchbot
+      APP_DB_URL: postgresql://lunchbot_app:lunchbot_app_dev@postgres:5432/lunchbot
+
+  app-green:
+    env_file: !override
+      - ./.env
+    environment:
+      DATABASE_URL: postgresql://lunchbot:${POSTGRES_PASSWORD:-dev}@postgres:5432/lunchbot
+      APP_DB_URL: postgresql://lunchbot_app:lunchbot_app_dev@postgres:5432/lunchbot

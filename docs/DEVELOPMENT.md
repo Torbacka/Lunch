@@ -90,6 +90,57 @@ export $(grep -v '^#' .env | xargs)
 FLASK_APP=lunchbot FLASK_ENV=development flask run --port 5000
 ```
 
+### Reusable Cloudflare tunnel for Slack testing
+
+Use the repo tunnel helper when you need Slack to reach your local app while iterating. It creates a named Cloudflare Tunnel once, attaches a DNS hostname to it, and then reuses the same public URL on each run.
+
+Defaults:
+
+| Setting | Default |
+|---|---|
+| Tunnel name | `lunchbot-local` |
+| Public hostname | `lunch-local.torbacka.se` |
+| Local origin | `http://127.0.0.1:5000` |
+
+One-time setup:
+
+```bash
+scripts/cloudflare-tunnel.sh setup
+```
+
+If `cloudflared` is not already authenticated, the setup command opens `cloudflared tunnel login`. Select the Cloudflare account and zone that own `lunch-local.torbacka.se`.
+
+Start the app and tunnel:
+
+```bash
+FLASK_APP=lunchbot FLASK_ENV=development flask run --port 5000
+scripts/cloudflare-tunnel.sh run
+```
+
+For the Docker blue slot, point the tunnel at port `5001`:
+
+```bash
+CLOUDFLARE_TUNNEL_URL=http://127.0.0.1:5001 scripts/cloudflare-tunnel.sh run
+```
+
+Configure the Slack app to use the stable tunnel hostname:
+
+| Slack setting | URL |
+|---|---|
+| OAuth redirect URL | `https://lunch-local.torbacka.se/slack/oauth_redirect` |
+| Slash command request URL | `https://lunch-local.torbacka.se/slack/command` |
+| Interactivity request URL | `https://lunch-local.torbacka.se/action` |
+| Events request URL | `https://lunch-local.torbacka.se/slack/events` |
+
+Override the tunnel name, hostname, or local origin when needed:
+
+```bash
+CLOUDFLARE_TUNNEL_NAME=my-tunnel \
+CLOUDFLARE_TUNNEL_HOSTNAME=my-host.example.com \
+CLOUDFLARE_TUNNEL_URL=http://127.0.0.1:5000 \
+scripts/cloudflare-tunnel.sh setup
+```
+
 ### Option B — Docker Compose (for integration testing)
 
 Use this when you need the full stack (app + Postgres + Prometheus + Grafana) running together, or when testing the production image.
@@ -102,12 +153,10 @@ docker compose up postgres -d
 docker compose --profile blue up --build
 ```
 
-The `app-blue` container reads its environment from `/opt/lunchbot/.env` on the host (as defined in `docker-compose.yml`). For local development, symlink or copy your `.env` there:
-
-```bash
-sudo mkdir -p /opt/lunchbot
-sudo cp .env /opt/lunchbot/.env
-```
+For local development, `docker-compose.override.yml` makes the app containers
+read the repo's `.env` file and use the Compose `postgres` service. Production
+continues to read `/opt/lunchbot/.env` because `deploy.sh` explicitly loads only
+`docker-compose.yml`.
 
 The `entrypoint.sh` runs `alembic upgrade head` before starting gunicorn, so migrations apply automatically on container start.
 
