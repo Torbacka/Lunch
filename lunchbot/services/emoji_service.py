@@ -33,14 +33,16 @@ def search_suggestions(emoji_entry, location):
     return results
 
 
-def update_database(results, emoji_string):
+def update_database(results, emoji_string, location_id=None):
     """Update emoji tag for all restaurants found in results.
 
     Extracts place_ids from results and calls db_client.add_emoji.
     """
     place_ids = [r['place_id'] for r in results]
     if place_ids:
-        count = db_client.add_emoji(place_ids, emoji_string)
+        count = db_client.add_emoji(
+            place_ids, emoji_string, location_id=location_id,
+        )
         logger.info('Updated %d restaurants with emoji %s', count, emoji_string)
 
 
@@ -72,7 +74,9 @@ def search_and_update_emoji(location, location_id=None, team_id=None):
         website = result.get('website', '')
         url = result.get('url', '')
         if website or url:
-            db_client.update_restaurant_urls(place_id, website=website, url=url)
+            db_client.update_restaurant_urls(
+                place_id, website=website, url=url, location_id=location_id,
+            )
             logger.info('Details for %s: website=%s', r.get('name', '?'), website or url)
 
     # Tag restaurants with emoji based on cuisine type
@@ -83,4 +87,6 @@ def search_and_update_emoji(location, location_id=None, team_id=None):
     for emoji_entry in emojis:
         emoji_results = search_suggestions(emoji_entry, location)
         if emoji_results:
-            update_database(emoji_results, emoji_entry['emoji'])
+            update_database(
+                emoji_results, emoji_entry['emoji'], location_id=location_id,
+            )

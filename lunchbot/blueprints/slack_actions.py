@@ -7,6 +7,7 @@ import json
 import threading
 import structlog
 from datetime import date, time
+from urllib.parse import urlparse
 
 from flask import Blueprint, current_app, request, jsonify, g
 
@@ -20,6 +21,7 @@ from lunchbot.client.workspace_client import (
 )
 from lunchbot.client import slack_client
 from lunchbot.services import vote_service, poll_service, seed_service
+from lunchbot.services.cuisine_map import classify_cuisine
 from lunchbot.blueprints.polls import (
     CHANNEL_LOC_USE_DEFAULT, CHANNEL_LOC_PICK, CHANNEL_LOC_ADD_OFFICE,
 )
@@ -40,6 +42,12 @@ from lunchbot.services.app_home_service import (
     CALLBACK_RENAME_OFFICE, CALLBACK_DELETE_OFFICE,
 )
 from lunchbot.services.scheduler_service import update_schedule_job
+from lunchbot.services.restaurant_selector_service import (
+    ACTION_ADD_RESTAURANT, CALLBACK_ADD_CUSTOM_RESTAURANT,
+    CUSTOM_ADDRESS_ACTION, CUSTOM_CUISINE_ACTION, CUSTOM_NAME_ACTION,
+    CUSTOM_NAME_BLOCK, CUSTOM_URL_ACTION, CUSTOM_URL_BLOCK,
+    build_custom_restaurant_modal, decode_custom_option, encode_custom_option,
+)
 
 logger = structlog.get_logger(__name__)
 
@@ -63,7 +71,7 @@ def suggest(place_id, team_id, channel_id):
     Then upserts a poll option for today.
     T-03-17: place_id used in parameterized SQL only.
     """
-    restaurant = db_client.get_restaurant_by_place_id(place_id)
+    restaurant = db_client.get_restaurant_for_channel(place_id, team_id, channel_id)
     if restaurant and not restaurant.get('url'):
         details = places_client.get_details(place_id)
         result = details.get('result', {})
@@ -71,9 +79,16 @@ def suggest(place_id, team_id, channel_id):
             place_id,
             result.get('url', ''),
             result.get('website', ''),
+            location_id=restaurant['location_id'],
         )
     if restaurant:
-        db_client.upsert_suggestion(date.today(), restaurant['id'], team_id, channel_id)
+        cuisine = classify_cuisine(restaurant.get('types'), restaurant.get('name', ''))
+        poll_id = db_client.upsert_suggestion(
+            date.today(), restaurant['id'], team_id, channel_id,
+            pick_type='manual', cuisine=cuisine,
+        )
+        return restaurant if poll_id is not None else None
+    return None
 
 
 @bp.route('/action', methods=['POST'])
@@ -127,8 +142,53 @@ def _handle_block_actions(payload):
         slack_client.views_open(trigger_id, modal, team_id)
         return '', 200
 
+    if action_id == ACTION_ADD_RESTAURANT:
+        return _handle_add_restaurant(payload, first_action, team_id, trigger_id)
+
     # Legacy: existing vote/suggest handling
     return _handle_legacy_action(payload, first_action)
+
+
+def _handle_add_restaurant(payload, first_action, team_id, trigger_id):
+    """Add a Google result or open the free-text confirmation modal."""
+    channel_id = payload.get('channel', {}).get('id', '')
+    location = resolve_location_for_channel(team_id, channel_id) if channel_id else None
+    if not location:
+        logger.warning('restaurant_add_unbound_channel', team_id=team_id, channel_id=channel_id)
+        return '', 200
+
+    selected_value = first_action.get('selected_option', {}).get('value', '')
+    custom_query = decode_custom_option(selected_value)
+    message_ts = (
+        payload.get('message', {}).get('ts')
+        or payload.get('container', {}).get('message_ts', '')
+    )
+
+    if custom_query is not None:
+        if not custom_query:
+            return '', 200
+        modal = build_custom_restaurant_modal(
+            custom_query, team_id, channel_id, message_ts,
+        )
+        slack_client.views_open(trigger_id, modal, team_id)
+        return '', 200
+
+    if selected_value and suggest(selected_value, team_id, channel_id):
+        _refresh_poll_message(team_id, channel_id, message_ts)
+    return '', 200
+
+
+def _refresh_poll_message(team_id, channel_id, message_ts):
+    """Rebuild the poll after an option is manually added."""
+    if not message_ts:
+        return
+    options = db_client.get_votes(date.today(), channel_id)
+    for option in options:
+        option['voter_elements'] = vote_service.build_voter_elements(
+            option.get('votes', []), team_id,
+        )
+    blocks = poll_service.build_poll_blocks(options)
+    slack_client.update_message(channel_id, message_ts, blocks, team_id)
 
 
 def _handle_channel_location_bind(action_id, payload, first_action):
@@ -312,6 +372,55 @@ def _handle_view_submission(payload):
         _refresh_app_home(user_id, team_id)
         return '', 200
 
+    if callback_id == CALLBACK_ADD_CUSTOM_RESTAURANT:
+        channel_id = private_metadata.get('channel_id', '')
+        message_ts = private_metadata.get('message_ts', '')
+        location = resolve_location_for_channel(team_id, channel_id) if channel_id else None
+        if not location:
+            return jsonify({
+                'response_action': 'errors',
+                'errors': {CUSTOM_NAME_BLOCK: 'This channel is not bound to an office.'},
+            })
+
+        name = ' '.join((_extract_value(values, CUSTOM_NAME_ACTION, 'value') or '').split())
+        if not name:
+            return jsonify({
+                'response_action': 'errors',
+                'errors': {CUSTOM_NAME_BLOCK: 'Enter a restaurant name.'},
+            })
+
+        website = (_extract_value(values, CUSTOM_URL_ACTION, 'value') or '').strip()
+        if website:
+            parsed = urlparse(website)
+            unsafe_url = any(char.isspace() or char in '<>|' for char in website)
+            if parsed.scheme not in ('http', 'https') or not parsed.netloc or unsafe_url:
+                return jsonify({
+                    'response_action': 'errors',
+                    'errors': {CUSTOM_URL_BLOCK: 'Enter a valid http or https URL.'},
+                })
+
+        vicinity = ' '.join(
+            (_extract_value(values, CUSTOM_ADDRESS_ACTION, 'value') or '').split()
+        )
+        cuisine = ' '.join(
+            (_extract_value(values, CUSTOM_CUISINE_ACTION, 'value') or '').split()
+        )
+        restaurant = db_client.save_custom_restaurant(
+            name,
+            location['id'],
+            team_id,
+            vicinity=vicinity or None,
+            website=website or None,
+            cuisine=cuisine or None,
+        )
+        poll_id = db_client.upsert_suggestion(
+            date.today(), restaurant['id'], team_id, channel_id,
+            pick_type='manual', cuisine=cuisine or None,
+        )
+        if poll_id is not None:
+            _refresh_poll_message(team_id, channel_id, message_ts)
+        return '', 200
+
     if callback_id == CALLBACK_RENAME_OFFICE:
         if not slack_client.is_workspace_admin(user_id, team_id):
             return jsonify({
@@ -434,7 +543,7 @@ def find_suggestions():
     T-03-15: Slack signature middleware validates request origin.
     """
     payload = json.loads(request.form.get('payload', '{}'))
-    search_value = payload.get('value', '')
+    search_value = ' '.join((payload.get('value', '') or '').split())[:80]
     logger.info('suggestion_search', search_value=search_value)
 
     # Office search (Add-office modal) is a Places Autocomplete proxy and does
@@ -460,11 +569,26 @@ def find_suggestions():
     if not location:
         return jsonify({'options': []})
 
-    response = places_client.find_suggestion(search_value, location)
-    db_client.save_restaurants(response, location_row['id'])
+    if not search_value:
+        return jsonify({'options': []})
+
+    try:
+        response = places_client.find_suggestion(search_value, location)
+    except Exception:
+        logger.exception('restaurant_suggestion_search_failed')
+        response = {'results': []}
+    db_client.save_restaurants(
+        response, location_row['id'], workspace_id=g.workspace_id,
+    )
+
+    existing_place_ids = {
+        option['place_id'] for option in db_client.get_votes(date.today(), channel_id)
+    }
 
     options = []
-    for result in response.get('results', []):
+    for result in response.get('results', [])[:19]:
+        if result['place_id'] in existing_place_ids:
+            continue
         opening_hours = result.get('opening_hours', {})
         open_status = 'open' if opening_hours.get('open_now') else 'closed'
         rating = result.get('rating', '')
@@ -474,5 +598,13 @@ def find_suggestions():
             'text': {'type': 'plain_text', 'text': text},
             'value': result['place_id'],
         })
+
+    options.append({
+        'text': {
+            'type': 'plain_text',
+            'text': f'Add "{search_value}" as a custom restaurant'[:75],
+        },
+        'value': encode_custom_option(search_value),
+    })
 
     return jsonify({'options': options})

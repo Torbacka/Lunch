@@ -4,6 +4,7 @@ All queries use psycopg3 parameterized SQL (D-06).
 Connection pool accessed via Flask app context (D-05).
 Tenant context set via execute_with_tenant for RLS enforcement.
 """
+import hashlib
 import json
 import logging
 
@@ -94,6 +95,27 @@ def upsert_suggestion(poll_date, restaurant_id, workspace_id, slack_channel_id,
         if workspace_id:
             conn.execute(f"SET app.current_tenant = '{workspace_id}'")
         with conn.cursor(row_factory=dict_row) as cur:
+            cur.execute("""
+                SELECT r.id
+                FROM restaurants r
+                JOIN channel_locations cl
+                  ON cl.location_id = r.location_id
+                 AND cl.team_id = r.workspace_id
+                WHERE r.id = %(restaurant_id)s
+                  AND r.workspace_id = %(workspace_id)s
+                  AND cl.channel_id = %(slack_channel_id)s
+            """, {
+                'restaurant_id': restaurant_id,
+                'workspace_id': workspace_id,
+                'slack_channel_id': slack_channel_id,
+            })
+            if cur.fetchone() is None:
+                logger.warning(
+                    'Rejected cross-office suggestion: restaurant=%s workspace=%s channel=%s',
+                    restaurant_id, workspace_id, slack_channel_id,
+                )
+                return None
+
             # Upsert poll for this date and channel.
             cur.execute("""
                 INSERT INTO polls (poll_date, workspace_id, slack_channel_id)
@@ -155,7 +177,7 @@ def save_restaurant(restaurant, location_id, workspace_id=None):
                 VALUES (%(place_id)s, %(name)s, %(rating)s, %(price_level)s, %(geometry)s,
                     %(photos)s, %(opening_hours)s, %(icon)s, %(vicinity)s, %(types)s,
                     %(user_ratings_total)s, %(workspace_id)s, %(location_id)s)
-                ON CONFLICT (place_id) DO UPDATE SET
+                ON CONFLICT (workspace_id, location_id, place_id) DO UPDATE SET
                     name = EXCLUDED.name,
                     rating = EXCLUDED.rating,
                     price_level = EXCLUDED.price_level,
@@ -166,8 +188,6 @@ def save_restaurant(restaurant, location_id, workspace_id=None):
                     vicinity = EXCLUDED.vicinity,
                     types = EXCLUDED.types,
                     user_ratings_total = EXCLUDED.user_ratings_total,
-                    workspace_id = EXCLUDED.workspace_id,
-                    location_id = COALESCE(restaurants.location_id, EXCLUDED.location_id),
                     updated_at = NOW()
                 RETURNING id
             """, {
@@ -189,7 +209,7 @@ def save_restaurant(restaurant, location_id, workspace_id=None):
             return result['id']
 
 
-def save_restaurants(restaurants_response, location_id):
+def save_restaurants(restaurants_response, location_id, workspace_id=None):
     """Batch upsert restaurants from Google Places API search response.
     Replaces mongo_client.save_restaurants_info().
     Returns list of restaurant ids.
@@ -197,12 +217,68 @@ def save_restaurants(restaurants_response, location_id):
     """
     ids = []
     for restaurant in restaurants_response.get('results', []):
-        restaurant_id = save_restaurant(restaurant, location_id)
+        restaurant_id = save_restaurant(
+            restaurant, location_id, workspace_id=workspace_id,
+        )
         ids.append(restaurant_id)
     return ids
 
 
-def update_restaurant_urls(place_id, website='', url=''):
+def normalize_custom_restaurant_name(name):
+    """Normalize a custom restaurant name for office-local deduplication."""
+    return ' '.join((name or '').split()).casefold()
+
+
+def save_custom_restaurant(name, location_id, workspace_id, *, vicinity=None,
+                           website=None, cuisine=None):
+    """Create or update a free-text restaurant owned by one office."""
+    clean_name = ' '.join((name or '').split())
+    normalized_name = normalize_custom_restaurant_name(clean_name)
+    if not normalized_name:
+        raise ValueError('Restaurant name must not be empty')
+
+    digest = hashlib.sha256(normalized_name.encode('utf-8')).hexdigest()
+    place_id = f'custom:{digest}'
+    types = [cuisine] if cuisine else []
+
+    with get_pool().connection() as conn:
+        if workspace_id:
+            conn.execute(f"SET app.current_tenant = '{workspace_id}'")
+        with conn.cursor(row_factory=dict_row) as cur:
+            cur.execute("""
+                INSERT INTO restaurants (
+                    place_id, name, website, vicinity, types, workspace_id,
+                    location_id, source, normalized_name
+                )
+                VALUES (
+                    %(place_id)s, %(name)s, %(website)s, %(vicinity)s, %(types)s,
+                    %(workspace_id)s, %(location_id)s, 'custom', %(normalized_name)s
+                )
+                ON CONFLICT (workspace_id, location_id, place_id) DO UPDATE SET
+                    name = EXCLUDED.name,
+                    website = COALESCE(EXCLUDED.website, restaurants.website),
+                    vicinity = COALESCE(EXCLUDED.vicinity, restaurants.vicinity),
+                    types = CASE
+                        WHEN cardinality(EXCLUDED.types) > 0 THEN EXCLUDED.types
+                        ELSE restaurants.types
+                    END,
+                    normalized_name = EXCLUDED.normalized_name,
+                    updated_at = NOW()
+                RETURNING *
+            """, {
+                'place_id': place_id,
+                'name': clean_name,
+                'website': website or None,
+                'vicinity': vicinity or None,
+                'types': types,
+                'workspace_id': workspace_id,
+                'location_id': location_id,
+                'normalized_name': normalized_name,
+            })
+            return cur.fetchone()
+
+
+def update_restaurant_urls(place_id, website='', url='', location_id=None):
     """Update website and url for a restaurant by place_id."""
     workspace_id = getattr(g, 'workspace_id', None)
     with get_pool().connection() as conn:
@@ -213,10 +289,16 @@ def update_restaurant_urls(place_id, website='', url=''):
                 UPDATE restaurants
                 SET website = %(website)s, url = %(url)s, updated_at = NOW()
                 WHERE place_id = %(place_id)s
-            """, {'place_id': place_id, 'website': website, 'url': url})
+                  AND (%(location_id)s::integer IS NULL OR location_id = %(location_id)s)
+            """, {
+                'place_id': place_id,
+                'website': website,
+                'url': url,
+                'location_id': location_id,
+            })
 
 
-def add_emoji(place_ids, emoji_string):
+def add_emoji(place_ids, emoji_string, location_id=None):
     """Update emoji for multiple restaurants. Replaces mongo_client.add_emoji().
     Returns count of updated rows.
     """
@@ -229,29 +311,67 @@ def add_emoji(place_ids, emoji_string):
                 UPDATE restaurants
                 SET emoji = %(emoji)s, updated_at = NOW()
                 WHERE place_id = ANY(%(place_ids)s)
+                  AND (%(location_id)s::integer IS NULL OR location_id = %(location_id)s)
                   AND (emoji IS NULL OR emoji = '')
-            """, {'emoji': emoji_string, 'place_ids': place_ids})
+            """, {
+                'emoji': emoji_string,
+                'place_ids': place_ids,
+                'location_id': location_id,
+            })
             logger.info('Updated emoji to %s for %d restaurants', emoji_string, cur.rowcount)
             return cur.rowcount
 
 
-def get_restaurant_by_place_id(place_id):
-    """Get a restaurant by its Google Places place_id."""
+def get_restaurant_by_place_id(place_id, location_id=None):
+    """Get a restaurant by provider id, optionally scoped to one office."""
     return execute_with_tenant(
-        "SELECT * FROM restaurants WHERE place_id = %(place_id)s",
-        {'place_id': place_id},
+        """
+        SELECT * FROM restaurants
+        WHERE place_id = %(place_id)s
+          AND (%(location_id)s::integer IS NULL OR location_id = %(location_id)s)
+        """,
+        {'place_id': place_id, 'location_id': location_id},
         fetch='one'
     )
 
 
-def update_restaurant_url(place_id, url, website):
+def get_restaurant_for_channel(place_id, workspace_id, channel_id):
+    """Return a restaurant only when it belongs to the channel's bound office."""
+    with get_pool().connection() as conn:
+        if workspace_id:
+            conn.execute(f"SET app.current_tenant = '{workspace_id}'")
+        with conn.cursor(row_factory=dict_row) as cur:
+            cur.execute("""
+                SELECT r.*
+                FROM restaurants r
+                JOIN channel_locations cl
+                  ON cl.location_id = r.location_id
+                 AND cl.team_id = r.workspace_id
+                WHERE r.place_id = %(place_id)s
+                  AND r.workspace_id = %(workspace_id)s
+                  AND cl.channel_id = %(channel_id)s
+            """, {
+                'place_id': place_id,
+                'workspace_id': workspace_id,
+                'channel_id': channel_id,
+            })
+            return cur.fetchone()
+
+
+def update_restaurant_url(place_id, url, website, location_id=None):
     """Update restaurant URL and website. Replaces mongo_client.add_restaurant_url()."""
     return execute_with_tenant("""
         UPDATE restaurants
         SET url = %(url)s, website = %(website)s, updated_at = NOW()
         WHERE place_id = %(place_id)s
+          AND (%(location_id)s::integer IS NULL OR location_id = %(location_id)s)
         RETURNING *
-    """, {'url': url, 'website': website, 'place_id': place_id}, fetch='one')
+    """, {
+        'url': url,
+        'website': website,
+        'place_id': place_id,
+        'location_id': location_id,
+    }, fetch='one')
 
 
 def get_or_create_stats(channel_id, restaurant_id, team_id):
@@ -303,7 +423,7 @@ def get_candidate_pool(poll_date, channel_id):
         LEFT JOIN restaurant_stats rs
                ON rs.restaurant_id = r.id
               AND rs.channel_id = %(channel_id)s
-        WHERE r.rating IS NOT NULL
+        WHERE (r.rating IS NOT NULL OR r.source = 'custom')
           AND r.location_id = (SELECT location_id FROM channel_office)
           AND r.id NOT IN (
               SELECT po.restaurant_id

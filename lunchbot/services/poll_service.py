@@ -11,6 +11,7 @@ from flask import current_app
 from lunchbot.client import db_client
 from lunchbot.client import slack_client
 from lunchbot.services.recommendation_service import ensure_poll_options
+from lunchbot.services.restaurant_selector_service import ACTION_ADD_RESTAURANT
 
 logger = structlog.get_logger(__name__)
 
@@ -87,6 +88,20 @@ def build_poll_blocks(options):
 
         blocks.append({'type': 'divider'})
 
+    blocks.append({
+        'type': 'actions',
+        'elements': [{
+            'type': 'external_select',
+            'action_id': ACTION_ADD_RESTAURANT,
+            'placeholder': {
+                'type': 'plain_text',
+                'text': 'Add a restaurant',
+                'emoji': True,
+            },
+            'min_query_length': 2,
+        }],
+    })
+
     # Footer with unique voter count
     unique_count = len(all_voter_ids)
     voter_word = 'voter' if unique_count == 1 else 'voters'
@@ -102,22 +117,33 @@ def _restaurant_line(option):
     """Build mrkdwn text: :emoji: *Name* rating · Cuisine  :walking: Xmin  :brain: Smart"""
     emoji = option.get('emoji') or 'fork_and_knife'
     rating = option.get('rating')
-    name_part = f':{emoji}: *{option["name"]}*'
+    name = _escape_slack_text(option['name'])
+    name_part = f':{emoji}: *{name}*'
     if rating:
         name_part += f' {rating}:star:'
     parts = [name_part]
 
     if cuisine := option.get('cuisine'):
-        parts[0] += f' \u00b7 {cuisine}'
+        parts[0] += f' \u00b7 {_escape_slack_text(cuisine)}'
 
     if (mins := option.get('walking_minutes')) is not None:
         parts.append(f':walking: {mins} min')
 
     pick_type = option.get('pick_type', 'random')
-    badge = ':brain: `Smart`' if pick_type == 'smart' else ':game_die: `Wild Card`'
+    if pick_type == 'smart':
+        badge = ':brain: `Smart`'
+    elif pick_type == 'manual':
+        badge = ':pencil2: `Added`'
+    else:
+        badge = ':game_die: `Wild Card`'
     parts.append(badge)
 
     return '  '.join(parts)
+
+
+def _escape_slack_text(value):
+    """Escape characters Slack interprets as mentions or links in mrkdwn."""
+    return str(value).replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;')
 
 
 def _fallback_vote_text(votes):

@@ -22,11 +22,20 @@ def _ensure_workspace_and_location(app):
         )
         row = cur.fetchone()
         if row:
-            return row[0]
-        cur.execute(
-            "SELECT id FROM workspace_locations WHERE team_id = 'T_TEST' LIMIT 1"
+            location_id = row[0]
+        else:
+            cur.execute(
+                "SELECT id FROM workspace_locations WHERE team_id = 'T_TEST' LIMIT 1"
+            )
+            location_id = cur.fetchone()[0]
+        conn.execute(
+            "INSERT INTO channel_locations (team_id, channel_id, location_id) "
+            "VALUES ('T_TEST', 'C_TEST', %s) "
+            "ON CONFLICT (team_id, channel_id) DO UPDATE "
+            "SET location_id = EXCLUDED.location_id",
+            (location_id,),
         )
-        return cur.fetchone()[0]
+        return location_id
 
 
 def test_schema_tables_exist(app_context, app):

@@ -48,7 +48,8 @@ def _insert_restaurant(conn, workspace_id, location_id, place_id='place_1', name
         cur.execute(
             """INSERT INTO restaurants (place_id, name, workspace_id, rating, location_id)
                VALUES (%s, %s, %s, %s, %s)
-               ON CONFLICT (place_id) DO UPDATE SET name = EXCLUDED.name, rating = EXCLUDED.rating
+               ON CONFLICT (workspace_id, location_id, place_id)
+               DO UPDATE SET name = EXCLUDED.name, rating = EXCLUDED.rating
                RETURNING id""",
             (place_id, name, workspace_id, rating, location_id)
         )

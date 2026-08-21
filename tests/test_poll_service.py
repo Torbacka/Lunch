@@ -204,6 +204,46 @@ class TestBuildPollBlocks:
             # 3 unique voters: ALICE, BOB, CAROL (ALICE voted twice but counted once)
             assert '3 voters' in footer['elements'][0]['text']
 
+    def test_restaurant_selector_present(self, app):
+        """Every poll offers an office-bounded external restaurant selector."""
+        with app.app_context():
+            from lunchbot.services.poll_service import build_poll_blocks
+            from lunchbot.services.restaurant_selector_service import ACTION_ADD_RESTAURANT
+
+            blocks = build_poll_blocks(SAMPLE_OPTIONS)
+            actions = blocks[-2]
+            selector = actions['elements'][0]
+
+            assert actions['type'] == 'actions'
+            assert selector['type'] == 'external_select'
+            assert selector['action_id'] == ACTION_ADD_RESTAURANT
+            assert selector['min_query_length'] == 2
+
+    def test_manual_pick_badge(self, app):
+        options = [{
+            'id': 1, 'name': 'Known Place', 'rating': None, 'emoji': None,
+            'url': '', 'votes': [], 'pick_type': 'manual',
+        }]
+        with app.app_context():
+            from lunchbot.services.poll_service import build_poll_blocks
+            blocks = build_poll_blocks(options)
+            assert '`Added`' in blocks[3]['text']['text']
+
+    def test_user_controlled_restaurant_text_is_escaped(self, app):
+        options = [{
+            'id': 1, 'name': 'Cafe <!channel>', 'rating': None, 'emoji': None,
+            'url': '', 'votes': [], 'pick_type': 'manual',
+            'cuisine': 'Food & <@U123>',
+        }]
+        with app.app_context():
+            from lunchbot.services.poll_service import build_poll_blocks
+            line = build_poll_blocks(options)[3]['text']['text']
+
+        assert '<!channel>' not in line
+        assert '<@U123>' not in line
+        assert 'Cafe &lt;!channel&gt;' in line
+        assert 'Food &amp; &lt;@U123&gt;' in line
+
     def test_no_cuisine_omitted(self, app):
         """When cuisine is None, it should not appear in the line."""
         options = [{

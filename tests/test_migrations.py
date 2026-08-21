@@ -68,4 +68,4 @@ def test_migration_current_shows_head():
         env=ALEMBIC_ENV,
     )
     assert result.returncode == 0
-    assert '010' in result.stdout, f"Expected revision 010 in: {result.stdout}"
+    assert '011' in result.stdout, f"Expected revision 011 in: {result.stdout}"
