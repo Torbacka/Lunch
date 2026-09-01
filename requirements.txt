@@ -4,7 +4,7 @@ alembic==1.18.4
 python-dotenv==1.2.2
 requests==2.33.1
 gunicorn==25.3.0
-pytest==8.3.5
+pytest==9.0.3
 slack_sdk==3.41.0
 cryptography==46.0.6
 numpy==2.4.2
